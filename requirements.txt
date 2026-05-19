@@ -1,4 +1,5 @@
 Flask
-pyodbc
+python-dotenv
+pymssql
 pandas
 matplotlib
