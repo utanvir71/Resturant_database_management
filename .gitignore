@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Flask
+instance/
+.webassets-cache/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# SQLite / local DB junk
+*.db
+*.sqlite3
+
+# Jupyter
+.ipynb_checkpoints/
+
+# SQL Server / local exports
+*.bak
+*.csv
+*.tsv
+exports/
+analytics/*.csv
+
+# Uploaded files / generated reports
+uploads/
+reports/
+tmp/
+temp/
+
+# Node (if you add frontend tooling later)
+node_modules/
+
+# PySpark / big data temp files
+metastore_db/
+spark-warehouse/
+derby.log
+
+# Secrets / credentials
+config.local.py
+secrets.json
+credentials.json
+
+# IDE
+.idea/
