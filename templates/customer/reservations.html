@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% set sidebar_title = "Customer Panel" %}
+{% set sidebar_subtitle = "Book tables, review reservations, and interact with the restaurant system." %}
+{% set nav_heading = "Customer Navigation" %}
+{% set active_page = "reservations" %}
+{% set page_title = "My Reservations" %}
+{% set page_subtitle = "Look up reservation history by customer phone number." %}
+{% set topbar_badge = "Customer View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/customer/dashboard"},
+    {"key": "make_reservation", "label": "Make Reservation", "href": "/customer/make_reservation"},
+    {"key": "reservations", "label": "My Reservations", "href": "/customer/reservations"},
+    {"key": "menu", "label": "Menu", "href": "/customer/menu"},
+    {"key": "feedback", "label": "Feedback", "href": "/customer/feedback"},
+    {"key": "login", "label": "Back to Login", "href": "/"}
+] %}
+
+{% block title %}My Reservations{% endblock %}
+
+{% block content %}
+{% if success %}
+<div class="alert alert-success">
+    Reservation submitted successfully. Your new booking is saved with Pending status.
+</div>
+{% endif %}
+
+<section class="hero">
+    <div>
+        <h2>Reservation History</h2>
+        <p>
+            Enter a customer phone number to view matching reservations from the database.
+            After creating a reservation, this page automatically uses the submitted phone number.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/customer/make_reservation" class="btn-primary">Make Another Reservation</a>
+        <a href="/customer/dashboard" class="btn-secondary">Back to Dashboard</a>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Find Reservations</h2>
+    <form method="get" action="/customer/reservations" class="lookup-form">
+        <div class="form-group">
+            <label for="phone">Customer Phone</label>
+            <input
+                type="text"
+                id="phone"
+                name="phone"
+                value="{{ phone }}"
+                placeholder="010-xxxx-xxxx"
+            >
+        </div>
+        <div class="form-actions form-actions-inline">
+            <button type="submit" class="btn btn-primary">Search</button>
+            <a href="/customer/reservations?phone=" class="btn btn-secondary">Clear</a>
+        </div>
+    </form>
+</section>
+
+<section class="panel panel-spaced">
+    <div class="table-meta">
+        <div>
+            <h2>Reservation List</h2>
+            {% if phone %}
+            <p>Showing reservations for {{ phone }}.</p>
+            {% else %}
+            <p>Search by phone number to show customer reservation history.</p>
+            {% endif %}
+        </div>
+        <p class="reservation-count">{{ reservations|length }} records</p>
+    </div>
+
+    {% if reservations %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Customer</th>
+                    <th>Branch</th>
+                    <th>Table</th>
+                    <th>Date &amp; Time</th>
+                    <th>Party</th>
+                    <th>Status</th>
+                    <th>Special Request</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for reservation in reservations %}
+                <tr>
+                    <td>{{ reservation.reservation_id }}</td>
+                    <td>{{ reservation.customer_name }}</td>
+                    <td>{{ reservation.branch_name }}</td>
+                    <td>{{ reservation.table_number }} ({{ reservation.capacity }})</td>
+                    <td>{{ reservation.reservation_datetime }}</td>
+                    <td>{{ reservation.party_size }}</td>
+                    <td>
+                        {% set status = reservation.reservation_status|lower %}
+                        <span class="badge
+                            {% if status == 'confirmed' %}confirmed
+                            {% elif status == 'pending' %}pending
+                            {% elif status == 'completed' %}completed
+                            {% elif status == 'cancelled' %}cancelled
+                            {% elif status == 'noshow' %}noshow
+                            {% endif %}">
+                            {{ reservation.reservation_status }}
+                        </span>
+                    </td>
+                    <td>{{ reservation.special_request if reservation.special_request else 'N/A' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No reservations found</h3>
+        <p>Submit a new reservation or search using a phone number already stored in Customers.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

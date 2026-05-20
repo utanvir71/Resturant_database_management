@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Restaurant Big Data System{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="layout">
+        {% if sidebar_title is defined %}
+        <aside class="sidebar">
+            <div class="brand">
+                <h2>{{ sidebar_title }}</h2>
+                <p>{{ sidebar_subtitle if sidebar_subtitle is defined else 'Smart restaurant reservation, operations, and analytics panel.' }}</p>
+            </div>
+
+            {% if nav_links is defined and nav_links %}
+            <div class="sidebar-section">
+                <h3>{{ nav_heading if nav_heading is defined else 'Navigation' }}</h3>
+                {% for link in nav_links %}
+                <a href="{{ link.href }}" class="{% if active_page is defined and active_page == link.key %}active{% endif %}">
+                    {{ link.label }}
+                </a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </aside>
+        {% endif %}
+
+        <main class="main">
+            {% if page_title is defined %}
+            <div class="topbar">
+                <div>
+                    <h1>{{ page_title }}</h1>
+                    {% if page_subtitle is defined %}
+                    <p>{{ page_subtitle }}</p>
+                    {% endif %}
+                </div>
+                {% if topbar_badge is defined %}
+                <div class="topbar-badge">{{ topbar_badge }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <div class="content">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

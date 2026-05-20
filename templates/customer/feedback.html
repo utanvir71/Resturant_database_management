@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% set sidebar_title = "Customer Panel" %}
+{% set sidebar_subtitle = "Book tables, review reservations, and interact with the restaurant system." %}
+{% set nav_heading = "Customer Navigation" %}
+{% set active_page = "feedback" %}
+{% set page_title = "Feedback" %}
+{% set page_subtitle = "Submit feedback for completed dining sessions." %}
+{% set topbar_badge = "Customer View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/customer/dashboard"},
+    {"key": "make_reservation", "label": "Make Reservation", "href": "/customer/make_reservation"},
+    {"key": "reservations", "label": "My Reservations", "href": "/customer/reservations"},
+    {"key": "menu", "label": "Menu", "href": "/customer/menu"},
+    {"key": "feedback", "label": "Feedback", "href": "/customer/feedback"},
+    {"key": "login", "label": "Back to Login", "href": "/"}
+] %}
+
+{% block title %}Customer Feedback{% endblock %}
+
+{% block content %}
+{% if success %}
+<div class="alert alert-success">
+    Feedback submitted successfully.
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
+<section class="hero">
+    <div>
+        <h2>Give Feedback</h2>
+        <p>Select a completed dining session, choose a rating, and save feedback to the database.</p>
+    </div>
+    <div class="hero-actions">
+        <a href="/customer/reservations" class="btn-primary">My Reservations</a>
+        <a href="/customer/dashboard" class="btn-secondary">Back to Dashboard</a>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Find Completed Sessions</h2>
+    <form method="get" action="/customer/feedback" class="lookup-form">
+        <div class="form-group">
+            <label for="phone">Customer Phone</label>
+            <input
+                type="text"
+                id="phone"
+                name="phone"
+                value="{{ phone }}"
+                placeholder="010-xxxx-xxxx"
+            >
+        </div>
+        <div class="form-actions form-actions-inline">
+            <button type="submit" class="btn btn-primary">Search</button>
+            <a href="/customer/feedback?phone=" class="btn btn-secondary">Clear</a>
+        </div>
+    </form>
+</section>
+
+<section class="panel panel-spaced">
+    <h2>Feedback Form</h2>
+    <p>Feedback records are linked to Dining_Sessions through session_id.</p>
+
+    <form method="post" action="/customer/feedback?phone={{ phone }}" class="form-grid">
+        <div class="form-group form-group-wide">
+            <label for="session_id">Completed Session</label>
+            <select id="session_id" name="session_id" required>
+                <option value="">Select Session</option>
+                {% for session in sessions %}
+                <option
+                    value="{{ session.session_id }}"
+                    {% if form_data.get('session_id') == session.session_id|string %}selected{% endif %}
+                >
+                    #{{ session.session_id }} - {{ session.customer_name }} - {{ session.branch_name }} - Table {{ session.table_number }} - {{ session.session_start }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="rating">Rating</label>
+            <select id="rating" name="rating" required>
+                <option value="">Select Rating</option>
+                {% for value in [5, 4, 3, 2, 1] %}
+                <option value="{{ value }}" {% if form_data.get('rating') == value|string %}selected{% endif %}>
+                    {{ value }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group form-group-wide">
+            <label for="comments">Comments</label>
+            <textarea
+                id="comments"
+                name="comments"
+                rows="4"
+                placeholder="Share your dining experience"
+            >{{ form_data.get('comments', '') }}</textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" {% if not sessions %}disabled{% endif %}>Submit Feedback</button>
+            <a href="/customer/dashboard" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+
+    {% if not sessions %}
+    <div class="empty-state">
+        <h3>No completed sessions found</h3>
+        <p>Search by a phone number with closed dining sessions before submitting feedback.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

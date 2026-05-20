@@ -1,0 +1,143 @@
+
+
+{% extends "base.html" %}
+
+{% set sidebar_title = "Staff Panel" %}
+{% set sidebar_subtitle = "Track dining sessions, orders, and branch-level service activity." %}
+{% set nav_heading = "Staff Navigation" %}
+{% set active_page = "active_sessions" %}
+{% set page_title = "Active Dining Sessions" %}
+{% set page_subtitle = "Monitor live table usage, current guests, and session activity across branches." %}
+{% set topbar_badge = "Staff View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/staff/dashboard"},
+    {"key": "active_sessions", "label": "Active Sessions", "href": "/staff/active_sessions"},
+    {"key": "orders", "label": "Orders", "href": "/staff/orders"},
+    {"key": "customer", "label": "Customer Panel", "href": "/customer/dashboard"},
+    {"key": "admin", "label": "Admin Panel", "href": "/admin/dashboard"},
+    {"key": "login", "label": "Back to Login", "href": "/"}
+] %}
+
+{% block title %}Active Dining Sessions{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <h2>Live Dining Floor View</h2>
+        <p>
+            Staff can review currently open dining sessions, check which tables are occupied,
+            and track active customer service activity across every restaurant branch.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/staff/orders" class="btn-primary">View Orders</a>
+        <a href="/staff/dashboard" class="btn-secondary">Back to Dashboard</a>
+    </div>
+</section>
+
+<section class="summary-cards">
+    <div class="summary-card">
+        <h3>Total Open Sessions</h3>
+        <p>{{ active_sessions|length if active_sessions else 0 }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Branches Active</h3>
+        <p>{{ active_sessions | map(attribute='branch_name') | list | unique | list | length if active_sessions else 0 }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Tables Occupied</h3>
+        <p>{{ active_sessions | map(attribute='table_number') | list | length if active_sessions else 0 }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Tracked Customers</h3>
+        <p>{{ active_sessions | map(attribute='customer_name') | list | length if active_sessions else 0 }}</p>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="table-meta">
+        <div>
+            <h2>Open Session List</h2>
+            <p>Each record shows a currently active dining session linked to customer, table, and branch information.</p>
+        </div>
+    </div>
+
+    {% if active_sessions %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Session ID</th>
+                    <th>Customer</th>
+                    <th>Branch</th>
+                    <th>Area</th>
+                    <th>Table</th>
+                    <th>Reservation ID</th>
+                    <th>Session Start</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for session in active_sessions %}
+                <tr>
+                    <td>{{ session.session_id }}</td>
+                    <td>{{ session.customer_name }}</td>
+                    <td>{{ session.branch_name }}</td>
+                    <td>{{ session.area_name }}</td>
+                    <td>{{ session.table_number }}</td>
+                    <td>{{ session.reservation_id if session.reservation_id else 'Walk-in' }}</td>
+                    <td>{{ session.session_start }}</td>
+                    <td>
+                        {% set status = session.session_status|lower %}
+                        <span class="badge {% if status == 'open' %}open{% elif status == 'closed' %}closed{% else %}pending{% endif %}">
+                            {{ session.session_status }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No active sessions found</h3>
+        <p>There are currently no dining sessions marked as open in the database.</p>
+    </div>
+    {% endif %}
+</section>
+
+<section class="grid panel-spaced">
+    <div class="panel">
+        <h3>How This Page Helps Staff</h3>
+        <p>
+            This page gives service staff a clear live view of current guests and occupied tables.
+            It can be used alongside the orders page to understand which sessions are still active.
+        </p>
+        <div class="stats-list">
+            <div class="stats-item">
+                <span>Session Tracking</span>
+                <span>Live</span>
+            </div>
+            <div class="stats-item">
+                <span>Table Usage</span>
+                <span>Visible</span>
+            </div>
+            <div class="stats-item">
+                <span>Branch Coverage</span>
+                <span>Multi-Branch</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>Next Staff Actions</h3>
+        <p>Use the linked pages below to continue service operations.</p>
+        <div class="footer-links">
+            <a href="/staff/orders">Orders Page</a>
+            <a href="/staff/dashboard">Staff Dashboard</a>
+            <a href="/admin/reservations">Admin Reservations</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

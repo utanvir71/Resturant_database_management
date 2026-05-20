@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% set sidebar_title = "Customer Panel" %}
+{% set sidebar_subtitle = "Book tables, review reservations, and interact with the restaurant system." %}
+{% set nav_heading = "Customer Navigation" %}
+{% set active_page = "make_reservation" %}
+{% set page_title = "Make a Reservation" %}
+{% set page_subtitle = "Choose a branch, select an available table, and submit a new reservation request." %}
+{% set topbar_badge = "Customer View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/customer/dashboard"},
+    {"key": "make_reservation", "label": "Make Reservation", "href": "/customer/make_reservation"},
+    {"key": "reservations", "label": "My Reservations", "href": "/customer/reservations"},
+    {"key": "menu", "label": "Menu", "href": "/customer/menu"},
+    {"key": "feedback", "label": "Feedback", "href": "/customer/feedback"},
+    {"key": "login", "label": "Back to Login", "href": "/"}
+] %}
+
+{% block title %}Make Reservation{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <h2>Reserve Your Table</h2>
+        <p>
+            Enter customer details, pick a branch and table, then submit the booking.
+            New customers are created automatically by phone number before the reservation is saved.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/customer/reservations" class="btn-primary">View My Reservations</a>
+        <a href="/customer/dashboard" class="btn-secondary">Back to Dashboard</a>
+    </div>
+</section>
+
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
+<section class="panel">
+    <h2>Reservation Form</h2>
+    <p>Branch and table options are loaded from the restaurant database.</p>
+
+    <form method="post" action="/customer/make_reservation" class="form-grid">
+        <div class="form-group">
+            <label for="full_name">Full Name</label>
+            <input
+                type="text"
+                id="full_name"
+                name="full_name"
+                value="{{ form_data.get('full_name', '') }}"
+                placeholder="Enter your full name"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="phone">Phone Number</label>
+            <input
+                type="text"
+                id="phone"
+                name="phone"
+                value="{{ form_data.get('phone', '') }}"
+                placeholder="010-xxxx-xxxx"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="email">Email Address</label>
+            <input
+                type="email"
+                id="email"
+                name="email"
+                value="{{ form_data.get('email', '') }}"
+                placeholder="example@email.com"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="branch_id">Branch</label>
+            <select id="branch_id" name="branch_id" required>
+                <option value="">Select Branch</option>
+                {% for branch in branches %}
+                <option
+                    value="{{ branch.branch_id }}"
+                    {% if form_data.get('branch_id') == branch.branch_id|string %}selected{% endif %}
+                >
+                    {{ branch.branch_name }} - {{ branch.location }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="table_id">Table</label>
+            <select id="table_id" name="table_id" required>
+                <option value="">Select Table</option>
+                {% for table in tables %}
+                <option
+                    value="{{ table.table_id }}"
+                    {% if form_data.get('table_id') == table.table_id|string %}selected{% endif %}
+                >
+                    {{ table.branch_name }} - {{ table.table_number }} ({{ table.area_name }}, Capacity {{ table.capacity }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="reservation_datetime">Reservation Date &amp; Time</label>
+            <input
+                type="datetime-local"
+                id="reservation_datetime"
+                name="reservation_datetime"
+                value="{{ form_data.get('reservation_datetime', '') }}"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="party_size">Party Size</label>
+            <input
+                type="number"
+                id="party_size"
+                name="party_size"
+                min="1"
+                value="{{ form_data.get('party_size', '') }}"
+                placeholder="Number of guests"
+                required
+            >
+        </div>
+
+        <div class="form-group form-group-wide">
+            <label for="special_request">Special Request</label>
+            <textarea
+                id="special_request"
+                name="special_request"
+                rows="4"
+                placeholder="Window seat, birthday setup, quiet table..."
+            >{{ form_data.get('special_request', '') }}</textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Submit Reservation</button>
+            <a href="/customer/dashboard" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</section>
+
+<section class="grid panel-spaced">
+    <div class="panel">
+        <h3>Database Workflow</h3>
+        <p>The form checks the phone number, creates a customer when needed, then inserts a pending reservation.</p>
+        <div class="stats-list">
+            <div class="stats-item">
+                <span>Customers</span>
+                <span>Lookup</span>
+            </div>
+            <div class="stats-item">
+                <span>Tables</span>
+                <span>Available</span>
+            </div>
+            <div class="stats-item">
+                <span>Reservations</span>
+                <span>Insert</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>After Submission</h3>
+        <p>Your phone number is used to show the reservation history page for the booking you just created.</p>
+        <div class="footer-links">
+            <a href="/customer/reservations">My Reservations</a>
+            <a href="/admin/reservations">Admin Reservation View</a>
+        </div>
+    </div>
+</section>
+{% endblock %}

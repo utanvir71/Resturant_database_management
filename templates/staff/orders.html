@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% set sidebar_title = "Staff Panel" %}
+{% set sidebar_subtitle = "Track dining sessions, orders, and branch-level service activity." %}
+{% set nav_heading = "Staff Navigation" %}
+{% set active_page = "orders" %}
+{% set page_title = "Orders" %}
+{% set page_subtitle = "Filter and review order records across branches, tables, customers, and staff." %}
+{% set topbar_badge = "Staff View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/staff/dashboard"},
+    {"key": "orders", "label": "Orders", "href": "/staff/orders"},
+    {"key": "customer", "label": "Customer Panel", "href": "/customer/dashboard"},
+    {"key": "admin", "label": "Admin Panel", "href": "/admin/dashboard"},
+    {"key": "login", "label": "Back to Login", "href": "/"}
+] %}
+
+{% block title %}Staff Orders{% endblock %}
+
+{% block content %}
+<section class="summary-cards">
+    <div class="summary-card">
+        <h3>Total Shown</h3>
+        <p>{{ orders|length }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Placed</h3>
+        <p>{{ orders | selectattr('order_status', 'equalto', 'Placed') | list | length }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Preparing</h3>
+        <p>{{ orders | selectattr('order_status', 'equalto', 'Preparing') | list | length }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Served</h3>
+        <p>{{ orders | selectattr('order_status', 'equalto', 'Served') | list | length }}</p>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Filter Orders</h2>
+    <form method="get" action="/staff/orders" class="filter-form">
+        <div class="form-group">
+            <label for="branch">Branch</label>
+            <select name="branch" id="branch">
+                <option value="">All Branches</option>
+                {% for branch in branches %}
+                <option value="{{ branch.branch_id }}" {% if selected_branch == branch.branch_id|string %}selected{% endif %}>
+                    {{ branch.branch_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="status">Order Status</label>
+            <select name="status" id="status">
+                <option value="">All Statuses</option>
+                {% for status in statuses %}
+                <option value="{{ status.order_status }}" {% if selected_status == status.order_status %}selected{% endif %}>
+                    {{ status.order_status }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Apply Filter</button>
+        <a href="/staff/orders" class="btn btn-secondary">Reset</a>
+    </form>
+</section>
+
+<section class="panel panel-spaced">
+    <div class="table-meta">
+        <div>
+            <h2>Order List</h2>
+            <p>Order totals are calculated from Order_Items quantity and agreed unit price.</p>
+        </div>
+        <p class="reservation-count">{{ orders|length }} records</p>
+    </div>
+
+    {% if orders %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Date &amp; Time</th>
+                    <th>Branch</th>
+                    <th>Table</th>
+                    <th>Customer</th>
+                    <th>Staff</th>
+                    <th>Items</th>
+                    <th>Total</th>
+                    <th>Order Status</th>
+                    <th>Session</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in orders %}
+                <tr>
+                    <td>{{ order.order_id }}</td>
+                    <td>{{ order.order_datetime }}</td>
+                    <td>{{ order.branch_name }}</td>
+                    <td>{{ order.table_number }}</td>
+                    <td>{{ order.customer_name }}</td>
+                    <td>{{ order.staff_name }}</td>
+                    <td>{{ order.item_count }}</td>
+                    <td>{{ "%.2f"|format(order.total_amount) }}</td>
+                    <td>
+                        {% set status = order.order_status|lower %}
+                        <span class="badge {{ status }}">{{ order.order_status }}</span>
+                    </td>
+                    <td>{{ order.session_status }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No orders found</h3>
+        <p>Try changing the selected branch or order status filter.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

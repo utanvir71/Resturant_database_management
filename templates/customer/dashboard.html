@@ -1,13 +1,107 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Dashboard</title>
-</head>
-<body>
-    <h1>Customer Dashboard</h1>
-    <p>Welcome to the customer panel.</p>
-    <a href="/">Back</a>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% set sidebar_title = "Customer Panel" %}
+{% set sidebar_subtitle = "Book tables, review reservations, and interact with the restaurant system." %}
+{% set nav_heading = "Customer Navigation" %}
+{% set active_page = "dashboard" %}
+{% set page_title = "Customer Dashboard" %}
+{% set page_subtitle = "Reserve tables and review your restaurant activity from one clean customer panel." %}
+{% set topbar_badge = "Customer View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/customer/dashboard"},
+    {"key": "make_reservation", "label": "Make Reservation", "href": "/customer/make_reservation"},
+    {"key": "reservations", "label": "My Reservations", "href": "/customer/reservations"},
+    {"key": "menu", "label": "Menu", "href": "/customer/menu"},
+    {"key": "feedback", "label": "Feedback", "href": "/customer/feedback"},
+    {"key": "login", "label": "Back to Login", "href": "/"}
+] %}
+
+{% block title %}Customer Dashboard{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <h2>Welcome to Smart Restaurant Reservations</h2>
+        <p>
+            Choose a branch, reserve an available table, and keep track of your booking history.
+            This customer workflow connects directly to the MSSQL reservation database.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/customer/make_reservation" class="btn-primary">Make Reservation</a>
+        <a href="/customer/reservations" class="btn-secondary">My Reservations</a>
+    </div>
+</section>
+
+<section class="cards">
+    <div class="card">
+        <p class="card-label">Branches</p>
+        <p class="card-value">{{ total_branches }}</p>
+        <p class="card-note">Restaurant locations available for booking</p>
+    </div>
+    <div class="card">
+        <p class="card-label">Available Tables</p>
+        <p class="card-value">{{ available_tables }}</p>
+        <p class="card-note">Tables currently marked available</p>
+    </div>
+    <div class="card">
+        <p class="card-label">Upcoming Reservations</p>
+        <p class="card-value">{{ upcoming_reservations }}</p>
+        <p class="card-note">Pending and confirmed future bookings</p>
+    </div>
+    <div class="card">
+        <p class="card-label">Available Menu Items</p>
+        <p class="card-value">{{ menu_items }}</p>
+        <p class="card-note">Branch menu records ready for service</p>
+    </div>
+</section>
+
+<section class="grid">
+    <div class="panel">
+        <h3>Quick Actions</h3>
+        <p>Open the main customer workflows for reservations, menu browsing, and feedback.</p>
+        <div class="quick-links">
+            <a href="/customer/make_reservation">Make Reservation</a>
+            <a href="/customer/reservations">My Reservations</a>
+            <a href="/customer/menu">View Menu</a>
+            <a href="/customer/feedback">Give Feedback</a>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>Reservation Flow</h3>
+        <p>The customer side uses existing database tables and writes new bookings into Reservations.</p>
+        <div class="stats-list">
+            <div class="stats-item">
+                <span>Customer</span>
+                <span>Phone</span>
+            </div>
+            <div class="stats-item">
+                <span>Branch</span>
+                <span>Table</span>
+            </div>
+            <div class="stats-item">
+                <span>Status</span>
+                <span>Pending</span>
+            </div>
+            <div class="stats-item">
+                <span>History</span>
+                <span>Live</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% if customer_phone %}
+<section class="panel panel-spaced">
+    <div class="table-meta">
+        <div>
+            <h2>Last Customer Lookup</h2>
+            <p>Reservation history is currently filtered with phone number {{ customer_phone }}.</p>
+        </div>
+        <a href="/customer/reservations" class="btn btn-primary">Open History</a>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

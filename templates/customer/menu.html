@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% set sidebar_title = "Customer Panel" %}
+{% set sidebar_subtitle = "Book tables, review reservations, and interact with the restaurant system." %}
+{% set nav_heading = "Customer Navigation" %}
+{% set active_page = "menu" %}
+{% set page_title = "Menu" %}
+{% set page_subtitle = "Browse available menu items and branch-specific prices." %}
+{% set topbar_badge = "Customer View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/customer/dashboard"},
+    {"key": "make_reservation", "label": "Make Reservation", "href": "/customer/make_reservation"},
+    {"key": "reservations", "label": "My Reservations", "href": "/customer/reservations"},
+    {"key": "menu", "label": "Menu", "href": "/customer/menu"},
+    {"key": "feedback", "label": "Feedback", "href": "/customer/feedback"},
+    {"key": "login", "label": "Back to Login", "href": "/"}
+] %}
+
+{% block title %}Customer Menu{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <h2>View Menu</h2>
+        <p>Menu items are loaded from Menu_Items, Menu_Categories, and Branch_Menu_Items.</p>
+    </div>
+    <div class="hero-actions">
+        <a href="/customer/make_reservation" class="btn-primary">Make Reservation</a>
+        <a href="/customer/dashboard" class="btn-secondary">Back to Dashboard</a>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Filter Menu</h2>
+    <form method="get" action="/customer/menu" class="filter-form">
+        <div class="form-group">
+            <label for="branch">Branch</label>
+            <select name="branch" id="branch">
+                <option value="">All Branches</option>
+                {% for branch in branches %}
+                <option value="{{ branch.branch_id }}" {% if selected_branch == branch.branch_id|string %}selected{% endif %}>
+                    {{ branch.branch_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Apply Filter</button>
+        <a href="/customer/menu" class="btn btn-secondary">Reset</a>
+    </form>
+</section>
+
+<section class="panel panel-spaced">
+    <div class="table-meta">
+        <div>
+            <h2>Available Items</h2>
+            <p>Prices are branch-specific and come from Branch_Menu_Items.</p>
+        </div>
+        <p class="reservation-count">{{ menu_items|length }} records</p>
+    </div>
+
+    {% if menu_items %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Branch</th>
+                    <th>Category</th>
+                    <th>Item</th>
+                    <th>Description</th>
+                    <th>Calories</th>
+                    <th>Price</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in menu_items %}
+                <tr>
+                    <td>{{ item.branch_name }}</td>
+                    <td>{{ item.category_name }}</td>
+                    <td>{{ item.item_name }}</td>
+                    <td>{{ item.description if item.description else 'N/A' }}</td>
+                    <td>{{ item.calories if item.calories else 'N/A' }}</td>
+                    <td>{{ "%.2f"|format(item.price) }}</td>
+                    <td>
+                        {% set status = item.availability_status|lower %}
+                        <span class="badge {% if status == 'available' %}confirmed{% else %}noshow{% endif %}">
+                            {{ item.availability_status }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No menu items found</h3>
+        <p>Try selecting another branch.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

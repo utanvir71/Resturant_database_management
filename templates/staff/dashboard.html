@@ -1,13 +1,118 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Dashboard</title>
-</head>
-<body>
-    <h1>Staff Dashboard</h1>
-    <p>Welcome to the staff panel.</p>
-    <a href="/">Back to Login</a>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% set sidebar_title = "Staff Panel" %}
+{% set sidebar_subtitle = "Track dining sessions, orders, and branch-level service activity." %}
+{% set nav_heading = "Staff Navigation" %}
+{% set active_page = "dashboard" %}
+{% set page_title = "Staff Dashboard" %}
+{% set page_subtitle = "Review live service activity and move quickly into order operations." %}
+{% set topbar_badge = "Staff View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/staff/dashboard"},
+    {"key": "orders", "label": "Orders", "href": "/staff/orders"},
+    {"key": "customer", "label": "Customer Panel", "href": "/customer/dashboard"},
+    {"key": "admin", "label": "Admin Panel", "href": "/admin/dashboard"},
+    {"key": "login", "label": "Back to Login", "href": "/"}
+] %}
+
+{% block title %}Staff Dashboard{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <h2>Service Operations</h2>
+        <p>
+            Staff can monitor open dining sessions, order progress, and branch activity using records
+            from Dining_Sessions, Orders, Staff, and Branches.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/staff/orders" class="btn-primary">View Orders</a>
+        <a href="/admin/reservations" class="btn-secondary">Reservations</a>
+    </div>
+</section>
+
+<section class="cards">
+    <div class="card">
+        <p class="card-label">Open Sessions</p>
+        <p class="card-value">{{ open_sessions }}</p>
+        <p class="card-note">Dining sessions currently marked open</p>
+    </div>
+    <div class="card">
+        <p class="card-label">Pending Orders</p>
+        <p class="card-value">{{ pending_orders }}</p>
+        <p class="card-note">Orders placed or preparing</p>
+    </div>
+    <div class="card">
+        <p class="card-label">Served Orders</p>
+        <p class="card-value">{{ served_orders }}</p>
+        <p class="card-note">Orders completed by service staff</p>
+    </div>
+    <div class="card">
+        <p class="card-label">Active Staff</p>
+        <p class="card-value">{{ active_staff }}</p>
+        <p class="card-note">Staff records with Active status</p>
+    </div>
+</section>
+
+<section class="grid">
+    <div class="panel">
+        <div class="table-meta">
+            <div>
+                <h3>Recent Orders</h3>
+                <p>Latest order records across branches.</p>
+            </div>
+            <a href="/staff/orders" class="btn btn-primary">Open Orders</a>
+        </div>
+
+        {% if recent_orders %}
+        <div class="table-wrapper">
+            <table class="compact-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Branch</th>
+                        <th>Table</th>
+                        <th>Staff</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in recent_orders %}
+                    <tr>
+                        <td>{{ order.order_id }}</td>
+                        <td>{{ order.branch_name }}</td>
+                        <td>{{ order.table_number }}</td>
+                        <td>{{ order.staff_name }}</td>
+                        <td>
+                            {% set status = order.order_status|lower %}
+                            <span class="badge {{ status }}">{{ order.order_status }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <h3>No orders found</h3>
+            <p>Order records will appear here after service activity is inserted.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="panel">
+        <h3>Branch Order Activity</h3>
+        <p>Order counts grouped by branch from existing staff-order relationships.</p>
+        <div class="stats-list">
+            {% for branch in branch_activity %}
+            <div class="stats-item">
+                <span>{{ branch.branch_name }}</span>
+                <span>{{ branch.total_orders }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}
