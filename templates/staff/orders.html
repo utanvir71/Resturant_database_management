@@ -10,6 +10,7 @@
 
 {% set nav_links = [
     {"key": "dashboard", "label": "Dashboard", "href": "/staff/dashboard"},
+    {"key": "active_sessions", "label": "Active Sessions", "href": "/staff/active_sessions"},
     {"key": "orders", "label": "Orders", "href": "/staff/orders"},
     {"key": "customer", "label": "Customer Panel", "href": "/customer/dashboard"},
     {"key": "admin", "label": "Admin Panel", "href": "/admin/dashboard"},
@@ -19,6 +20,20 @@
 {% block title %}Staff Orders{% endblock %}
 
 {% block content %}
+<section class="hero">
+    <div>
+        <h2>Order Operations</h2>
+        <p>
+            Review incoming and completed orders across branches, monitor service activity,
+            and move quickly between open dining sessions and live order handling.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/staff/active_sessions" class="btn-primary">View Active Sessions</a>
+        <a href="/staff/dashboard" class="btn-secondary">Back to Dashboard</a>
+    </div>
+</section>
+
 <section class="summary-cards">
     <div class="summary-card">
         <h3>Total Shown</h3>
@@ -123,5 +138,38 @@
         <p>Try changing the selected branch or order status filter.</p>
     </div>
     {% endif %}
+</section>
+<section class="grid panel-spaced">
+    <div class="panel">
+        <h3>How This Page Helps Staff</h3>
+        <p>
+            This page lets staff review branch orders, track preparation status, and understand
+            how order flow connects with active dining sessions on the restaurant floor.
+        </p>
+        <div class="stats-list">
+            <div class="stats-item">
+                <span>Placed Orders</span>
+                <span>{{ orders | selectattr('order_status', 'equalto', 'Placed') | list | length }}</span>
+            </div>
+            <div class="stats-item">
+                <span>Preparing Orders</span>
+                <span>{{ orders | selectattr('order_status', 'equalto', 'Preparing') | list | length }}</span>
+            </div>
+            <div class="stats-item">
+                <span>Served Orders</span>
+                <span>{{ orders | selectattr('order_status', 'equalto', 'Served') | list | length }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>Next Staff Actions</h3>
+        <p>Use the linked pages below to continue restaurant floor and service operations.</p>
+        <div class="footer-links">
+            <a href="/staff/active_sessions">Active Sessions</a>
+            <a href="/staff/dashboard">Staff Dashboard</a>
+            <a href="/admin/reservations">Admin Reservations</a>
+        </div>
+    </div>
 </section>
 {% endblock %}

@@ -624,6 +624,38 @@ def staff_orders():
     except Exception as e:
         return f"<h1>Staff Orders Error</h1><pre>{str(e)}</pre>"
 
+@app.route("/staff/active_sessions")
+def staff_active_sessions():
+    try:
+        active_sessions = fetch_all("""
+            SELECT
+                ds.session_id,
+                c.full_name AS customer_name,
+                b.branch_name,
+                da.area_name,
+                rt.table_number,
+                ds.reservation_id,
+                ds.session_start,
+                ds.session_status
+            FROM Dining_Sessions ds
+            JOIN Customers c
+                ON ds.customer_id = c.customer_id
+            JOIN Restaurant_Tables rt
+                ON ds.table_id = rt.table_id
+            JOIN Dining_Areas da
+                ON rt.area_id = da.area_id
+            JOIN Branches b
+                ON da.branch_id = b.branch_id
+            WHERE ds.session_status = 'Open'
+            ORDER BY ds.session_start DESC
+        """)
+
+        return render_template(
+            "staff/active_sessions.html",
+            active_sessions=active_sessions
+        )
+    except Exception as e:
+        return f"<h1>Active Sessions Page Error</h1><pre>{str(e)}</pre>"
 
 if __name__ == "__main__":
     app.run(debug=True, port=8001)

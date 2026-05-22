@@ -10,6 +10,7 @@
 
 {% set nav_links = [
     {"key": "dashboard", "label": "Dashboard", "href": "/staff/dashboard"},
+    {"key": "active_sessions", "label": "Active Sessions", "href": "/staff/active_sessions"},
     {"key": "orders", "label": "Orders", "href": "/staff/orders"},
     {"key": "customer", "label": "Customer Panel", "href": "/customer/dashboard"},
     {"key": "admin", "label": "Admin Panel", "href": "/admin/dashboard"},
@@ -28,7 +29,8 @@
         </p>
     </div>
     <div class="hero-actions">
-        <a href="/staff/orders" class="btn-primary">View Orders</a>
+        <a href="/staff/active_sessions" class="btn-primary">View Active Sessions</a>
+        <a href="/staff/orders" class="btn-secondary">View Orders</a>
         <a href="/admin/reservations" class="btn-secondary">Reservations</a>
     </div>
 </section>
@@ -57,6 +59,68 @@
 </section>
 
 <section class="grid">
+    <div class="panel">
+        <div class="table-meta">
+            <div>
+                <h3>Active Dining Sessions</h3>
+                <p>Live view of currently open dining sessions across branches.</p>
+            </div>
+            <a href="/staff/active_sessions" class="btn btn-primary">Open Active Sessions</a>
+        </div>
+
+        {% if recent_active_sessions %}
+        <div class="table-wrapper">
+            <table class="compact-table">
+                <thead>
+                    <tr>
+                        <th>Session ID</th>
+                        <th>Customer</th>
+                        <th>Branch</th>
+                        <th>Table</th>
+                        <th>Started</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for session in recent_active_sessions %}
+                    <tr>
+                        <td>{{ session.session_id }}</td>
+                        <td>{{ session.customer_name }}</td>
+                        <td>{{ session.branch_name }}</td>
+                        <td>{{ session.table_number }}</td>
+                        <td>{{ session.session_start }}</td>
+                        <td>
+                            {% set status = session.session_status|lower %}
+                            <span class="badge {{ status }}">{{ session.session_status }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <h3>No active sessions found</h3>
+            <p>Open dining sessions will appear here when customers are currently seated.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="panel">
+        <h3>Branch Session Activity</h3>
+        <p>Open dining session counts grouped by branch.</p>
+        <div class="stats-list">
+            {% for branch in active_session_branch_activity %}
+            <div class="stats-item">
+                <span>{{ branch.branch_name }}</span>
+                <span>{{ branch.total_open_sessions }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="grid panel-spaced">
     <div class="panel">
         <div class="table-meta">
             <div>

@@ -1,0 +1,149 @@
+
+
+{% extends "base.html" %}
+
+{% set sidebar_title = "Staff Panel" %}
+{% set sidebar_subtitle = "Track dining sessions, orders, and branch-level service activity." %}
+{% set nav_heading = "Staff Navigation" %}
+{% set active_page = "orders" %}
+{% set page_title = "Take Order" %}
+{% set page_subtitle = "Create a new order for an active dining session and add menu items for the table." %}
+{% set topbar_badge = "Staff View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/staff/dashboard"},
+    {"key": "active_sessions", "label": "Active Sessions", "href": "/staff/active_sessions"},
+    {"key": "orders", "label": "Orders", "href": "/staff/orders"},
+    {"key": "customer", "label": "Customer Panel", "href": "/customer/dashboard"},
+    {"key": "admin", "label": "Admin Panel", "href": "/admin/dashboard"},
+    {"key": "login", "label": "Back to Login", "href": "/"}
+] %}
+
+{% block title %}Take Order{% endblock %}
+
+{% block content %}
+{% if success %}
+<div class="alert alert-success">
+    {{ success }}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
+<section class="hero">
+    <div>
+        <h2>Create Order for Active Session</h2>
+        <p>
+            Select an open dining session, assign the order to a staff member, choose a menu item,
+            and save the order into the restaurant database.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/staff/active_sessions" class="btn-primary">View Active Sessions</a>
+        <a href="/staff/orders" class="btn-secondary">Back to Orders</a>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>New Order Form</h2>
+    <p>This form creates one order and one order item for a selected dining session.</p>
+
+    <form method="post" action="/staff/take_order" class="form-grid">
+        <div class="form-group form-group-wide">
+            <label for="session_id">Active Session</label>
+            <select id="session_id" name="session_id" required>
+                <option value="">Select Active Session</option>
+                {% for session in active_sessions %}
+                <option value="{{ session.session_id }}" {% if form_data.get('session_id') == session.session_id|string %}selected{% endif %}>
+                    #{{ session.session_id }} - {{ session.customer_name }} - {{ session.branch_name }} - Table {{ session.table_number }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="staff_id">Staff Member</label>
+            <select id="staff_id" name="staff_id" required>
+                <option value="">Select Staff</option>
+                {% for staff in staff_members %}
+                <option value="{{ staff.staff_id }}" {% if form_data.get('staff_id') == staff.staff_id|string %}selected{% endif %}>
+                    {{ staff.full_name }} - {{ staff.branch_name }} - {{ staff.role_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group form-group-wide">
+            <label for="item_id">Menu Item</label>
+            <select id="item_id" name="item_id" required>
+                <option value="">Select Menu Item</option>
+                {% for item in menu_items %}
+                <option value="{{ item.item_id }}" {% if form_data.get('item_id') == item.item_id|string %}selected{% endif %}>
+                    {{ item.branch_name }} - {{ item.item_name }} (₩{{ item.price }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="quantity">Quantity</label>
+            <input
+                type="number"
+                id="quantity"
+                name="quantity"
+                min="1"
+                value="{{ form_data.get('quantity', '') }}"
+                placeholder="Enter quantity"
+                required
+            >
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Create Order</button>
+            <a href="/staff/orders" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</section>
+
+<section class="grid panel-spaced">
+    <div class="panel">
+        <h3>Workflow</h3>
+        <p>
+            The form should insert one row into Orders and one related row into Order_Items.
+            The menu price should be taken from Branch_Menu_Items for the correct branch item.
+        </p>
+        <div class="stats-list">
+            <div class="stats-item">
+                <span>Step 1</span>
+                <span>Select Session</span>
+            </div>
+            <div class="stats-item">
+                <span>Step 2</span>
+                <span>Select Staff</span>
+            </div>
+            <div class="stats-item">
+                <span>Step 3</span>
+                <span>Select Menu Item</span>
+            </div>
+            <div class="stats-item">
+                <span>Step 4</span>
+                <span>Insert Order</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>Related Pages</h3>
+        <p>Use these pages to continue staff operations after taking an order.</p>
+        <div class="footer-links">
+            <a href="/staff/active_sessions">Active Sessions</a>
+            <a href="/staff/orders">Orders</a>
+            <a href="/staff/dashboard">Staff Dashboard</a>
+        </div>
+    </div>
+</section>
+{% endblock %}
