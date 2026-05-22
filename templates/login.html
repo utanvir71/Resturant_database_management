@@ -1,16 +1,66 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Restaurant System</title>
-</head>
-<body>
-    <h1>Restaurant System</h1>
-    <p>Select a role:</p>
+{% extends "base.html" %}
 
-    <a href="/customer/dashboard">Customer</a><br><br>
-    <a href="/staff/dashboard">Staff</a><br><br>
-    <a href="/admin/dashboard">Admin</a>
-</body>
-</html>
+{% set page_title = "Restaurant System Login" %}
+{% set page_subtitle = "Choose a role to enter the Smart Restaurant Reservation and Operations System." %}
+{% set topbar_badge = "MSSQL Project" %}
+
+{% block title %}Restaurant System Login{% endblock %}
+
+{% block content %}
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
+<section class="hero">
+    <div>
+        <h2>Smart Restaurant Reservation System</h2>
+        <p>
+            Customer access is public for the project demo. Staff and admin areas use simple shared passwords
+            so protected pages stay role-based without adding unnecessary authentication complexity.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/login/customer" class="btn-primary">Continue as Customer</a>
+    </div>
+</section>
+
+<section class="login-grid">
+    <div class="panel">
+        <h2>Customer Access</h2>
+        <p>Enter the customer panel directly to make reservations, view menu items, and submit feedback.</p>
+        <a href="/login/customer" class="btn btn-primary">Customer Panel</a>
+    </div>
+
+    <div class="panel">
+        <h2>Staff Login</h2>
+        <p>Staff members sign in with their registered phone number and the shared staff password.</p>
+        <form method="post" action="/login/staff" class="stacked-form">
+            <input type="hidden" name="next_url" value="{{ next_url }}">
+            <div class="form-group">
+                <label for="staff_phone">Staff Phone</label>
+                <input type="text" id="staff_phone" name="phone" placeholder="010-xxxx-xxxx" required>
+            </div>
+            <div class="form-group">
+                <label for="staff_password">Staff Password</label>
+                <input type="password" id="staff_password" name="password" placeholder="Shared staff password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Staff Login</button>
+        </form>
+    </div>
+
+    <div class="panel">
+        <h2>Admin Login</h2>
+        <p>Admin users sign in with the shared admin password to access management pages.</p>
+        <form method="post" action="/login/admin" class="stacked-form">
+            <input type="hidden" name="next_url" value="{{ next_url }}">
+            <div class="form-group">
+                <label for="admin_password">Admin Password</label>
+                <input type="password" id="admin_password" name="password" placeholder="Shared admin password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Admin Login</button>
+        </form>
+    </div>
+</section>
+{% endblock %}

@@ -11,9 +11,7 @@
 {% set nav_links = [
     {"key": "dashboard", "label": "Dashboard", "href": "/admin/dashboard"},
     {"key": "reservations", "label": "Reservations", "href": "/admin/reservations"},
-    {"key": "customer", "label": "Customer Panel", "href": "/customer/dashboard"},
-    {"key": "staff", "label": "Staff Panel", "href": "/staff/dashboard"},
-    {"key": "login", "label": "Back to Login", "href": "/"}
+    {"key": "logout", "label": "Logout", "href": "/logout"}
 ] %}
 
 {% block title %}Admin Dashboard{% endblock %}
@@ -29,7 +27,7 @@
     </div>
     <div class="hero-actions">
         <a href="/admin/reservations" class="btn-primary">Manage Reservations</a>
-        <a href="/staff/dashboard" class="btn-secondary">Open Staff Panel</a>
+        <a href="/logout" class="btn-secondary">Logout</a>
     </div>
 </section>
 
@@ -62,9 +60,8 @@
         <p>Jump directly into the core admin workflows.</p>
         <div class="quick-links">
             <a href="/admin/reservations">View Reservations</a>
-            <a href="/staff/dashboard">Go to Staff Dashboard</a>
-            <a href="/customer/dashboard">Go to Customer Dashboard</a>
-            <a href="/">Return to Login</a>
+            <a href="/admin/dashboard">Refresh Dashboard</a>
+            <a href="/logout">Logout</a>
         </div>
     </div>
 
@@ -94,7 +91,6 @@
 
 <div class="footer-links">
     <a href="/admin/reservations">Reservations Page</a>
-    <a href="/customer/dashboard">Customer Dashboard</a>
-    <a href="/staff/dashboard">Staff Dashboard</a>
+    <a href="/logout">Logout</a>
 </div>
 {% endblock %}

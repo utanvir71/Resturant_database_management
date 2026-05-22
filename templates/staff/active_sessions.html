@@ -7,16 +7,14 @@
 {% set nav_heading = "Staff Navigation" %}
 {% set active_page = "active_sessions" %}
 {% set page_title = "Active Dining Sessions" %}
-{% set page_subtitle = "Monitor live table usage, current guests, and session activity across branches." %}
+{% set page_subtitle = "Monitor live table usage, current guests, and session activity for your branch." %}
 {% set topbar_badge = "Staff View" %}
 
 {% set nav_links = [
     {"key": "dashboard", "label": "Dashboard", "href": "/staff/dashboard"},
     {"key": "active_sessions", "label": "Active Sessions", "href": "/staff/active_sessions"},
     {"key": "orders", "label": "Orders", "href": "/staff/orders"},
-    {"key": "customer", "label": "Customer Panel", "href": "/customer/dashboard"},
-    {"key": "admin", "label": "Admin Panel", "href": "/admin/dashboard"},
-    {"key": "login", "label": "Back to Login", "href": "/"}
+    {"key": "logout", "label": "Logout", "href": "/logout"}
 ] %}
 
 {% block title %}Active Dining Sessions{% endblock %}
@@ -27,7 +25,7 @@
         <h2>Live Dining Floor View</h2>
         <p>
             Staff can review currently open dining sessions, check which tables are occupied,
-            and track active customer service activity across every restaurant branch.
+            and track active customer service activity for your assigned restaurant branch.
         </p>
     </div>
     <div class="hero-actions">
@@ -125,7 +123,7 @@
             </div>
             <div class="stats-item">
                 <span>Branch Coverage</span>
-                <span>Multi-Branch</span>
+                <span>Assigned</span>
             </div>
         </div>
     </div>
@@ -136,7 +134,6 @@
         <div class="footer-links">
             <a href="/staff/orders">Orders Page</a>
             <a href="/staff/dashboard">Staff Dashboard</a>
-            <a href="/admin/reservations">Admin Reservations</a>
         </div>
     </div>
 </section>

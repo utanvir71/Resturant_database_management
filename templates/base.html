@@ -41,6 +41,17 @@
                 {% if topbar_badge is defined %}
                 <div class="topbar-badge">{{ topbar_badge }}</div>
                 {% endif %}
+                {% if session.get('role') %}
+                <div class="session-chip">
+                    {% if session.get('role') == 'staff' %}
+                    {{ session.get('staff_name') }} · {{ session.get('staff_branch_name') }}
+                    {% elif session.get('role') == 'admin' %}
+                    Admin
+                    {% else %}
+                    Customer
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
             {% endif %}
 

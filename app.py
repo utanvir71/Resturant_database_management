@@ -1,4 +1,5 @@
 from datetime import datetime
+from functools import wraps
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from config import Config
@@ -6,6 +7,28 @@ from db import execute_query, fetch_all, fetch_one
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+
+def require_role(role):
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapped_view(*args, **kwargs):
+            if session.get("role") != role:
+                return redirect(url_for("home", next=request.path))
+            return view_func(*args, **kwargs)
+        return wrapped_view
+    return decorator
+
+
+def current_staff_branch_id():
+    branch_id = session.get("staff_branch_id")
+    return int(branch_id) if branch_id else None
+
+
+def safe_redirect_target(next_url, fallback_endpoint):
+    if next_url and next_url.startswith("/") and not next_url.startswith("//"):
+        return next_url
+    return url_for(fallback_endpoint)
 
 
 def get_available_tables():
@@ -45,10 +68,86 @@ def load_make_reservation_context(error=None, form_data=None):
 
 @app.route("/")
 def home():
-    return render_template("login.html")
+    return render_template(
+        "login.html",
+        error=request.args.get("error"),
+        next_url=request.args.get("next", "")
+    )
+
+
+@app.route("/login/customer")
+def login_customer():
+    session.clear()
+    session["role"] = "customer"
+    return redirect(url_for("customer_dashboard"))
+
+
+@app.route("/login/admin", methods=["POST"])
+def login_admin():
+    password = request.form.get("password", "")
+
+    if password != app.config["ADMIN_PASSWORD"]:
+        return render_template(
+            "login.html",
+            error="Invalid admin password.",
+            next_url=request.form.get("next_url", "")
+        )
+
+    session.clear()
+    session["role"] = "admin"
+    session["admin_name"] = "System Admin"
+    return redirect(safe_redirect_target(request.form.get("next_url", ""), "admin_dashboard"))
+
+
+@app.route("/login/staff", methods=["POST"])
+def login_staff():
+    phone = request.form.get("phone", "").strip()
+    password = request.form.get("password", "")
+
+    if password != app.config["STAFF_PASSWORD"]:
+        return render_template(
+            "login.html",
+            error="Invalid staff phone or password.",
+            next_url=request.form.get("next_url", "")
+        )
+
+    staff = fetch_one("""
+        SELECT
+            s.staff_id,
+            s.branch_id,
+            s.full_name,
+            s.phone,
+            b.branch_name
+        FROM Staff s
+        JOIN Branches b ON s.branch_id = b.branch_id
+        WHERE s.phone = %s
+          AND s.staff_status = 'Active'
+    """, (phone,))
+
+    if not staff:
+        return render_template(
+            "login.html",
+            error="Invalid staff phone or inactive staff account.",
+            next_url=request.form.get("next_url", "")
+        )
+
+    session.clear()
+    session["role"] = "staff"
+    session["staff_id"] = staff["staff_id"]
+    session["staff_name"] = staff["full_name"]
+    session["staff_branch_id"] = staff["branch_id"]
+    session["staff_branch_name"] = staff["branch_name"]
+    return redirect(safe_redirect_target(request.form.get("next_url", ""), "staff_dashboard"))
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("home"))
 
 
 @app.route("/admin/dashboard")
+@require_role("admin")
 def admin_dashboard():
     try:
         total_branches_row = fetch_one("SELECT COUNT(*) AS total FROM Branches")
@@ -73,6 +172,7 @@ def admin_dashboard():
 
 
 @app.route("/admin/reservations")
+@require_role("admin")
 def admin_reservations():
     try:
         selected_branch = request.args.get("branch", "")
@@ -136,6 +236,7 @@ def admin_reservations():
 
 
 @app.route("/customer/dashboard")
+@require_role("customer")
 def customer_dashboard():
     try:
         total_branches_row = fetch_one("SELECT COUNT(*) AS total FROM Branches")
@@ -169,6 +270,7 @@ def customer_dashboard():
 
 
 @app.route("/customer/make_reservation", methods=["GET", "POST"])
+@require_role("customer")
 def customer_make_reservation():
     if request.method == "GET":
         try:
@@ -310,6 +412,7 @@ def customer_make_reservation():
 
 
 @app.route("/customer/reservations")
+@require_role("customer")
 def customer_reservations():
     try:
         requested_phone = request.args.get("phone")
@@ -355,6 +458,7 @@ def customer_reservations():
 
 
 @app.route("/customer/menu")
+@require_role("customer")
 def customer_menu():
     try:
         selected_branch = request.args.get("branch", "")
@@ -426,6 +530,7 @@ def get_feedback_sessions(phone=None):
 
 
 @app.route("/customer/feedback", methods=["GET", "POST"])
+@require_role("customer")
 def customer_feedback():
     requested_phone = request.args.get("phone")
     phone = requested_phone.strip() if requested_phone is not None else session.get("customer_phone", "")
@@ -491,38 +596,84 @@ def customer_feedback():
 
 
 @app.route("/staff/dashboard")
+@require_role("staff")
 def staff_dashboard():
     try:
+        branch_id = current_staff_branch_id()
+
         open_sessions_row = fetch_one("""
             SELECT COUNT(*) AS total
-            FROM Dining_Sessions
-            WHERE session_status = 'Open'
-        """)
+            FROM Dining_Sessions ds
+            JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+            JOIN Dining_Areas da ON rt.area_id = da.area_id
+            WHERE ds.session_status = 'Open'
+              AND da.branch_id = %s
+        """, (branch_id,))
         active_staff_row = fetch_one("""
             SELECT COUNT(*) AS total
             FROM Staff
             WHERE staff_status = 'Active'
-        """)
+              AND branch_id = %s
+        """, (branch_id,))
         pending_orders_row = fetch_one("""
             SELECT COUNT(*) AS total
-            FROM [Orders]
-            WHERE order_status IN ('Placed', 'Preparing')
-        """)
+            FROM [Orders] o
+            JOIN Dining_Sessions ds ON o.session_id = ds.session_id
+            JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+            JOIN Dining_Areas da ON rt.area_id = da.area_id
+            WHERE o.order_status IN ('Placed', 'Preparing')
+              AND da.branch_id = %s
+        """, (branch_id,))
         served_orders_row = fetch_one("""
             SELECT COUNT(*) AS total
-            FROM [Orders]
-            WHERE order_status = 'Served'
-        """)
+            FROM [Orders] o
+            JOIN Dining_Sessions ds ON o.session_id = ds.session_id
+            JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+            JOIN Dining_Areas da ON rt.area_id = da.area_id
+            WHERE o.order_status = 'Served'
+              AND da.branch_id = %s
+        """, (branch_id,))
         branch_activity = fetch_all("""
-            SELECT TOP 5
+            SELECT
                 b.branch_name,
                 COUNT(o.order_id) AS total_orders
             FROM Branches b
             LEFT JOIN Staff s ON b.branch_id = s.branch_id
             LEFT JOIN [Orders] o ON s.staff_id = o.staff_id
+            WHERE b.branch_id = %s
             GROUP BY b.branch_name
             ORDER BY total_orders DESC, b.branch_name
-        """)
+        """, (branch_id,))
+        active_session_branch_activity = fetch_all("""
+            SELECT
+                b.branch_name,
+                COUNT(ds.session_id) AS total_open_sessions
+            FROM Branches b
+            LEFT JOIN Dining_Areas da ON b.branch_id = da.branch_id
+            LEFT JOIN Restaurant_Tables rt ON da.area_id = rt.area_id
+            LEFT JOIN Dining_Sessions ds
+                ON rt.table_id = ds.table_id
+               AND ds.session_status = 'Open'
+            WHERE b.branch_id = %s
+            GROUP BY b.branch_name
+        """, (branch_id,))
+        recent_active_sessions = fetch_all("""
+            SELECT TOP 6
+                ds.session_id,
+                c.full_name AS customer_name,
+                b.branch_name,
+                rt.table_number,
+                ds.session_start,
+                ds.session_status
+            FROM Dining_Sessions ds
+            JOIN Customers c ON ds.customer_id = c.customer_id
+            JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+            JOIN Dining_Areas da ON rt.area_id = da.area_id
+            JOIN Branches b ON da.branch_id = b.branch_id
+            WHERE ds.session_status = 'Open'
+              AND b.branch_id = %s
+            ORDER BY ds.session_start DESC
+        """, (branch_id,))
         recent_orders = fetch_all("""
             SELECT TOP 6
                 o.order_id,
@@ -537,8 +688,9 @@ def staff_dashboard():
             JOIN Dining_Areas da ON rt.area_id = da.area_id
             JOIN Branches b ON da.branch_id = b.branch_id
             JOIN Staff s ON o.staff_id = s.staff_id
+            WHERE b.branch_id = %s
             ORDER BY o.order_datetime DESC
-        """)
+        """, (branch_id,))
 
         return render_template(
             "staff/dashboard.html",
@@ -547,19 +699,21 @@ def staff_dashboard():
             pending_orders=pending_orders_row["total"] if pending_orders_row else 0,
             served_orders=served_orders_row["total"] if served_orders_row else 0,
             branch_activity=branch_activity,
-            recent_orders=recent_orders
+            recent_orders=recent_orders,
+            recent_active_sessions=recent_active_sessions,
+            active_session_branch_activity=active_session_branch_activity
         )
     except Exception as e:
         return f"<h1>Staff Dashboard Error</h1><pre>{str(e)}</pre>"
 
 
 @app.route("/staff/orders")
+@require_role("staff")
 def staff_orders():
     try:
-        selected_branch = request.args.get("branch", "")
+        branch_id = current_staff_branch_id()
         selected_status = request.args.get("status", "")
 
-        branches = get_branches()
         statuses = fetch_all("""
             SELECT DISTINCT order_status
             FROM [Orders]
@@ -586,13 +740,9 @@ def staff_orders():
         JOIN Branches b ON da.branch_id = b.branch_id
         JOIN Staff s ON o.staff_id = s.staff_id
         LEFT JOIN Order_Items oi ON o.order_id = oi.order_id
-        WHERE 1=1
+        WHERE b.branch_id = %s
         """
-        params = []
-
-        if selected_branch:
-            query += " AND b.branch_id = %s"
-            params.append(int(selected_branch))
+        params = [branch_id]
 
         if selected_status:
             query += " AND o.order_status = %s"
@@ -616,17 +766,17 @@ def staff_orders():
         return render_template(
             "staff/orders.html",
             orders=orders,
-            branches=branches,
             statuses=statuses,
-            selected_branch=str(selected_branch),
             selected_status=selected_status
         )
     except Exception as e:
         return f"<h1>Staff Orders Error</h1><pre>{str(e)}</pre>"
 
 @app.route("/staff/active_sessions")
+@require_role("staff")
 def staff_active_sessions():
     try:
+        branch_id = current_staff_branch_id()
         active_sessions = fetch_all("""
             SELECT
                 ds.session_id,
@@ -647,8 +797,9 @@ def staff_active_sessions():
             JOIN Branches b
                 ON da.branch_id = b.branch_id
             WHERE ds.session_status = 'Open'
+              AND b.branch_id = %s
             ORDER BY ds.session_start DESC
-        """)
+        """, (branch_id,))
 
         return render_template(
             "staff/active_sessions.html",

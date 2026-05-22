@@ -121,6 +121,17 @@ body {
     white-space: nowrap;
 }
 
+.session-chip {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    color: var(--text-dark);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 .content {
     padding: 28px;
 }
@@ -358,6 +369,18 @@ body {
     align-items: end;
 }
 
+.login-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(220px, 1fr));
+    gap: 20px;
+}
+
+.stacked-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
 .form-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(180px, 1fr));
@@ -552,6 +575,10 @@ tr:hover {
 @media (max-width: 1100px) {
     .filter-form {
         grid-template-columns: 1fr 1fr;
+    }
+
+    .login-grid {
+        grid-template-columns: 1fr;
     }
 
     .form-grid {
