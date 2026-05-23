@@ -441,6 +441,28 @@ body {
     grid-column: auto;
 }
 
+.action-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.action-row form {
+    margin: 0;
+}
+
+.action-row .btn {
+    padding: 8px 11px;
+    font-size: 12px;
+}
+
+.muted-text {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 700;
+}
+
 .filter-buttons {
     display: flex;
     gap: 10px;

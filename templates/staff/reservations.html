@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% set sidebar_title = "Staff Panel" %}
+{% set sidebar_subtitle = "Track dining sessions, orders, and branch-level service activity." %}
+{% set nav_heading = "Staff Navigation" %}
+{% set active_page = "reservations" %}
+{% set page_title = "Staff Reservations" %}
+{% set page_subtitle = "Confirm, cancel, or mark no-show reservations for your assigned branch." %}
+{% set topbar_badge = "Staff View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/staff/dashboard"},
+    {"key": "reservations", "label": "Reservations", "href": "/staff/reservations"},
+    {"key": "active_sessions", "label": "Active Sessions", "href": "/staff/active_sessions"},
+    {"key": "orders", "label": "Orders", "href": "/staff/orders"},
+    {"key": "logout", "label": "Logout", "href": "/logout"}
+] %}
+
+{% block title %}Staff Reservations{% endblock %}
+
+{% block content %}
+{% if success %}
+<div class="alert alert-success">
+    {{ success }}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
+<section class="hero">
+    <div>
+        <h2>Branch Reservation Queue</h2>
+        <p>
+            Staff can update reservation status for their own branch. Confirmed reservations reserve the table,
+            while cancelled and no-show reservations release it back to available.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/staff/active_sessions" class="btn-primary">Active Sessions</a>
+        <a href="/staff/dashboard" class="btn-secondary">Back to Dashboard</a>
+    </div>
+</section>
+
+<section class="summary-cards">
+    <div class="summary-card">
+        <h3>Total Shown</h3>
+        <p>{{ reservations|length }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Pending</h3>
+        <p>{{ reservations | selectattr('reservation_status', 'equalto', 'Pending') | list | length }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Confirmed</h3>
+        <p>{{ reservations | selectattr('reservation_status', 'equalto', 'Confirmed') | list | length }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Completed</h3>
+        <p>{{ reservations | selectattr('reservation_status', 'equalto', 'Completed') | list | length }}</p>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Filter Reservations</h2>
+    <form method="get" action="/staff/reservations" class="filter-form">
+        <div class="form-group">
+            <label for="status">Status</label>
+            <select name="status" id="status">
+                <option value="">All Statuses</option>
+                <option value="Pending" {% if selected_status == 'Pending' %}selected{% endif %}>Pending</option>
+                <option value="Confirmed" {% if selected_status == 'Confirmed' %}selected{% endif %}>Confirmed</option>
+                <option value="Completed" {% if selected_status == 'Completed' %}selected{% endif %}>Completed</option>
+                <option value="Cancelled" {% if selected_status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                <option value="NoShow" {% if selected_status == 'NoShow' %}selected{% endif %}>NoShow</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Apply Filter</button>
+        <a href="/staff/reservations" class="btn btn-secondary">Reset</a>
+    </form>
+</section>
+
+<section class="panel panel-spaced">
+    <div class="table-meta">
+        <div>
+            <h2>Reservation List</h2>
+            <p>Status changes are processed through dbo.sp_UpdateReservationStatus.</p>
+        </div>
+        <p class="reservation-count">{{ reservations|length }} records</p>
+    </div>
+
+    {% if reservations %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Customer</th>
+                    <th>Phone</th>
+                    <th>Area</th>
+                    <th>Table</th>
+                    <th>Date &amp; Time</th>
+                    <th>Party</th>
+                    <th>Reservation</th>
+                    <th>Table Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for reservation in reservations %}
+                <tr>
+                    <td>{{ reservation.reservation_id }}</td>
+                    <td>{{ reservation.customer_name }}</td>
+                    <td>{{ reservation.phone }}</td>
+                    <td>{{ reservation.area_name }}</td>
+                    <td>{{ reservation.table_number }} ({{ reservation.capacity }})</td>
+                    <td>{{ reservation.reservation_datetime }}</td>
+                    <td>{{ reservation.party_size }}</td>
+                    <td>
+                        {% set status = reservation.reservation_status|lower %}
+                        <span class="badge
+                            {% if status == 'confirmed' %}confirmed
+                            {% elif status == 'pending' %}pending
+                            {% elif status == 'completed' %}completed
+                            {% elif status == 'cancelled' %}cancelled
+                            {% elif status == 'noshow' %}noshow
+                            {% endif %}">
+                            {{ reservation.reservation_status }}
+                        </span>
+                    </td>
+                    <td>{{ reservation.table_status }}</td>
+                    <td>
+                        <div class="action-row">
+                            {% if reservation.reservation_status == 'Pending' %}
+                            <form method="post" action="/staff/reservations/{{ reservation.reservation_id }}/status">
+                                <input type="hidden" name="new_status" value="Confirmed">
+                                <button type="submit" class="btn btn-primary">Confirm</button>
+                            </form>
+                            <form method="post" action="/staff/reservations/{{ reservation.reservation_id }}/status">
+                                <input type="hidden" name="new_status" value="Cancelled">
+                                <button type="submit" class="btn btn-secondary">Cancel</button>
+                            </form>
+                            {% elif reservation.reservation_status == 'Confirmed' %}
+                            <form method="post" action="/staff/reservations/{{ reservation.reservation_id }}/status">
+                                <input type="hidden" name="new_status" value="Cancelled">
+                                <button type="submit" class="btn btn-secondary">Cancel</button>
+                            </form>
+                            <form method="post" action="/staff/reservations/{{ reservation.reservation_id }}/status">
+                                <input type="hidden" name="new_status" value="NoShow">
+                                <button type="submit" class="btn btn-secondary">No Show</button>
+                            </form>
+                            {% else %}
+                            <span class="muted-text">No action</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No reservations found</h3>
+        <p>Try changing the status filter or wait for new customer reservations.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

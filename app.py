@@ -31,6 +31,15 @@ def safe_redirect_target(next_url, fallback_endpoint):
     return url_for(fallback_endpoint)
 
 
+def clean_db_error(error):
+    message = str(error)
+    if "b\"" in message:
+        message = message.split("b\"", 1)[1].split("\"", 1)[0]
+    elif "b'" in message:
+        message = message.split("b'", 1)[1].split("'", 1)[0]
+    return message.replace("\\n", " ").strip()
+
+
 def get_available_tables():
     return fetch_all("""
         SELECT
@@ -633,6 +642,14 @@ def staff_dashboard():
             WHERE o.order_status = 'Served'
               AND da.branch_id = %s
         """, (branch_id,))
+        pending_reservations_row = fetch_one("""
+            SELECT COUNT(*) AS total
+            FROM Reservations r
+            JOIN Restaurant_Tables rt ON r.table_id = rt.table_id
+            JOIN Dining_Areas da ON rt.area_id = da.area_id
+            WHERE r.reservation_status = 'Pending'
+              AND da.branch_id = %s
+        """, (branch_id,))
         branch_activity = fetch_all("""
             SELECT
                 b.branch_name,
@@ -698,6 +715,7 @@ def staff_dashboard():
             active_staff=active_staff_row["total"] if active_staff_row else 0,
             pending_orders=pending_orders_row["total"] if pending_orders_row else 0,
             served_orders=served_orders_row["total"] if served_orders_row else 0,
+            pending_reservations=pending_reservations_row["total"] if pending_reservations_row else 0,
             branch_activity=branch_activity,
             recent_orders=recent_orders,
             recent_active_sessions=recent_active_sessions,
@@ -705,6 +723,80 @@ def staff_dashboard():
         )
     except Exception as e:
         return f"<h1>Staff Dashboard Error</h1><pre>{str(e)}</pre>"
+
+
+@app.route("/staff/reservations")
+@require_role("staff")
+def staff_reservations():
+    try:
+        branch_id = current_staff_branch_id()
+        selected_status = request.args.get("status", "")
+
+        query = """
+        SELECT
+            r.reservation_id,
+            c.full_name AS customer_name,
+            c.phone,
+            b.branch_name,
+            da.area_name,
+            rt.table_number,
+            rt.capacity,
+            rt.table_status,
+            r.reservation_datetime,
+            r.party_size,
+            r.reservation_status,
+            r.special_request
+        FROM Reservations r
+        JOIN Customers c ON r.customer_id = c.customer_id
+        JOIN Restaurant_Tables rt ON r.table_id = rt.table_id
+        JOIN Dining_Areas da ON rt.area_id = da.area_id
+        JOIN Branches b ON da.branch_id = b.branch_id
+        WHERE b.branch_id = %s
+        """
+        params = [branch_id]
+
+        if selected_status:
+            query += " AND r.reservation_status = %s"
+            params.append(selected_status)
+
+        query += " ORDER BY r.reservation_datetime DESC"
+
+        reservations = fetch_all(query, tuple(params))
+
+        return render_template(
+            "staff/reservations.html",
+            reservations=reservations,
+            selected_status=selected_status,
+            success=request.args.get("success"),
+            error=request.args.get("error")
+        )
+    except Exception as e:
+        return f"<h1>Staff Reservations Error</h1><pre>{str(e)}</pre>"
+
+
+@app.route("/staff/reservations/<int:reservation_id>/status", methods=["POST"])
+@require_role("staff")
+def staff_update_reservation_status(reservation_id):
+    new_status = request.form.get("new_status", "").strip()
+    branch_id = current_staff_branch_id()
+
+    try:
+        execute_query("""
+            EXEC dbo.sp_UpdateReservationStatus
+                @reservation_id = %s,
+                @staff_branch_id = %s,
+                @new_status = %s
+        """, (reservation_id, branch_id, new_status))
+
+        return redirect(url_for(
+            "staff_reservations",
+            success=f"Reservation #{reservation_id} updated to {new_status}."
+        ))
+    except Exception as e:
+        return redirect(url_for(
+            "staff_reservations",
+            error=clean_db_error(e)
+        ))
 
 
 @app.route("/staff/orders")

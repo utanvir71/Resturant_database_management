@@ -10,6 +10,7 @@
 
 {% set nav_links = [
     {"key": "dashboard", "label": "Dashboard", "href": "/staff/dashboard"},
+    {"key": "reservations", "label": "Reservations", "href": "/staff/reservations"},
     {"key": "active_sessions", "label": "Active Sessions", "href": "/staff/active_sessions"},
     {"key": "orders", "label": "Orders", "href": "/staff/orders"},
     {"key": "logout", "label": "Logout", "href": "/logout"}
@@ -27,9 +28,9 @@
         </p>
     </div>
     <div class="hero-actions">
+        <a href="/staff/reservations" class="btn-primary">Manage Reservations</a>
         <a href="/staff/active_sessions" class="btn-primary">View Active Sessions</a>
         <a href="/staff/orders" class="btn-secondary">View Orders</a>
-        <a href="/admin/reservations" class="btn-secondary">Reservations</a>
     </div>
 </section>
 
@@ -50,9 +51,9 @@
         <p class="card-note">Orders completed by service staff</p>
     </div>
     <div class="card">
-        <p class="card-label">Active Staff</p>
-        <p class="card-value">{{ active_staff }}</p>
-        <p class="card-note">Staff records with Active status</p>
+        <p class="card-label">Pending Reservations</p>
+        <p class="card-value">{{ pending_reservations }}</p>
+        <p class="card-note">Reservations awaiting staff confirmation</p>
     </div>
 </section>
 
