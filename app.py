@@ -742,6 +742,13 @@ def staff_reservations():
             rt.table_number,
             rt.capacity,
             rt.table_status,
+            CASE
+                WHEN ds.session_status = 'Open' THEN 'Occupied'
+                WHEN r.reservation_status = 'Confirmed' AND ds.session_id IS NULL THEN 'Reserved'
+                ELSE rt.table_status
+            END AS effective_table_status,
+            ds.session_id,
+            ds.session_status,
             r.reservation_datetime,
             r.party_size,
             r.reservation_status,
@@ -751,6 +758,7 @@ def staff_reservations():
         JOIN Restaurant_Tables rt ON r.table_id = rt.table_id
         JOIN Dining_Areas da ON rt.area_id = da.area_id
         JOIN Branches b ON da.branch_id = b.branch_id
+        LEFT JOIN Dining_Sessions ds ON r.reservation_id = ds.reservation_id
         WHERE b.branch_id = %s
         """
         params = [branch_id]
@@ -797,6 +805,151 @@ def staff_update_reservation_status(reservation_id):
             "staff_reservations",
             error=clean_db_error(e)
         ))
+
+
+def load_open_session_context(error=None, success=None, form_data=None):
+    branch_id = current_staff_branch_id()
+    confirmed_reservations = fetch_all("""
+        SELECT
+            r.reservation_id,
+            c.full_name AS customer_name,
+            c.phone,
+            b.branch_name,
+            da.area_name,
+            rt.table_number,
+            rt.capacity,
+            rt.table_status,
+            r.reservation_datetime,
+            r.party_size
+        FROM Reservations r
+        JOIN Customers c ON r.customer_id = c.customer_id
+        JOIN Restaurant_Tables rt ON r.table_id = rt.table_id
+        JOIN Dining_Areas da ON rt.area_id = da.area_id
+        JOIN Branches b ON da.branch_id = b.branch_id
+        LEFT JOIN Dining_Sessions ds ON r.reservation_id = ds.reservation_id
+        WHERE b.branch_id = %s
+          AND r.reservation_status = 'Confirmed'
+          AND ds.session_id IS NULL
+        ORDER BY r.reservation_datetime ASC
+    """, (branch_id,))
+
+    available_tables = fetch_all("""
+        SELECT
+            rt.table_id,
+            rt.table_number,
+            rt.capacity,
+            da.area_name,
+            b.branch_name
+        FROM Restaurant_Tables rt
+        JOIN Dining_Areas da ON rt.area_id = da.area_id
+        JOIN Branches b ON da.branch_id = b.branch_id
+        WHERE b.branch_id = %s
+          AND rt.table_status = 'Available'
+        ORDER BY da.area_name, rt.capacity, rt.table_number
+    """, (branch_id,))
+
+    return {
+        "confirmed_reservations": confirmed_reservations,
+        "available_tables": available_tables,
+        "error": error,
+        "success": success,
+        "form_data": form_data or {},
+    }
+
+
+@app.route("/staff/open_session")
+@require_role("staff")
+def staff_open_session():
+    try:
+        form_data = {}
+        reservation_id = request.args.get("reservation_id", "").strip()
+        if reservation_id:
+            form_data["reservation_id"] = reservation_id
+
+        return render_template(
+            "staff/open_session.html",
+            **load_open_session_context(
+                success=request.args.get("success"),
+                error=request.args.get("error"),
+                form_data=form_data
+            )
+        )
+    except Exception as e:
+        return f"<h1>Open Session Page Error</h1><pre>{str(e)}</pre>"
+
+
+@app.route("/staff/open_session/reservation", methods=["POST"])
+@require_role("staff")
+def staff_open_session_from_reservation():
+    reservation_id = request.form.get("reservation_id", "").strip()
+    branch_id = current_staff_branch_id()
+
+    try:
+        execute_query("""
+            EXEC dbo.sp_OpenDiningSessionFromReservation
+                @reservation_id = %s,
+                @staff_branch_id = %s
+        """, (int(reservation_id), branch_id))
+
+        return redirect(url_for(
+            "staff_active_sessions",
+            success=f"Dining session opened for reservation #{reservation_id}."
+        ))
+    except ValueError:
+        return redirect(url_for(
+            "staff_open_session",
+            error="Please select a confirmed reservation."
+        ))
+    except Exception as e:
+        return redirect(url_for(
+            "staff_open_session",
+            error=clean_db_error(e),
+            reservation_id=reservation_id
+        ))
+
+
+@app.route("/staff/open_session/walkin", methods=["POST"])
+@require_role("staff")
+def staff_open_walkin_session():
+    form_data = request.form.to_dict()
+    branch_id = current_staff_branch_id()
+
+    try:
+        execute_query("""
+            EXEC dbo.sp_OpenWalkInDiningSession
+                @staff_branch_id = %s,
+                @full_name = %s,
+                @phone = %s,
+                @email = %s,
+                @table_id = %s
+        """, (
+            branch_id,
+            request.form.get("full_name", "").strip(),
+            request.form.get("phone", "").strip(),
+            request.form.get("email", "").strip() or None,
+            int(request.form.get("table_id", ""))
+        ))
+
+        return redirect(url_for(
+            "staff_active_sessions",
+            success="Walk-in dining session opened."
+        ))
+    except ValueError:
+        return render_template(
+            "staff/open_session.html",
+            **load_open_session_context(
+                error="Please select an available table for the walk-in session.",
+                form_data=form_data
+            )
+        )
+    except Exception as e:
+        return render_template(
+            "staff/open_session.html",
+            **load_open_session_context(
+                error=clean_db_error(e),
+                form_data=form_data
+            )
+        )
 
 
 @app.route("/staff/orders")
@@ -895,7 +1048,9 @@ def staff_active_sessions():
 
         return render_template(
             "staff/active_sessions.html",
-            active_sessions=active_sessions
+            active_sessions=active_sessions,
+            success=request.args.get("success"),
+            error=request.args.get("error")
         )
     except Exception as e:
         return f"<h1>Active Sessions Page Error</h1><pre>{str(e)}</pre>"

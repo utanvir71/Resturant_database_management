@@ -13,6 +13,7 @@
 {% set nav_links = [
     {"key": "dashboard", "label": "Dashboard", "href": "/staff/dashboard"},
     {"key": "reservations", "label": "Reservations", "href": "/staff/reservations"},
+    {"key": "open_session", "label": "Open Session", "href": "/staff/open_session"},
     {"key": "active_sessions", "label": "Active Sessions", "href": "/staff/active_sessions"},
     {"key": "orders", "label": "Orders", "href": "/staff/orders"},
     {"key": "logout", "label": "Logout", "href": "/logout"}
@@ -21,6 +22,18 @@
 {% block title %}Active Dining Sessions{% endblock %}
 
 {% block content %}
+{% if success %}
+<div class="alert alert-success">
+    {{ success }}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
 <section class="hero">
     <div>
         <h2>Live Dining Floor View</h2>
@@ -30,6 +43,7 @@
         </p>
     </div>
     <div class="hero-actions">
+        <a href="/staff/open_session" class="btn-primary">Open Session</a>
         <a href="/staff/orders" class="btn-primary">View Orders</a>
         <a href="/staff/dashboard" class="btn-secondary">Back to Dashboard</a>
     </div>
@@ -134,6 +148,7 @@
         <p>Use the linked pages below to continue service operations.</p>
         <div class="footer-links">
             <a href="/staff/reservations">Reservations</a>
+            <a href="/staff/open_session">Open Session</a>
             <a href="/staff/orders">Orders Page</a>
             <a href="/staff/dashboard">Staff Dashboard</a>
         </div>

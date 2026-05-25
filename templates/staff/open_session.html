@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% set sidebar_title = "Staff Panel" %}
+{% set sidebar_subtitle = "Track dining sessions, orders, and branch-level service activity." %}
+{% set nav_heading = "Staff Navigation" %}
+{% set active_page = "open_session" %}
+{% set page_title = "Open Dining Session" %}
+{% set page_subtitle = "Seat confirmed reservations or create walk-in dining sessions for your branch." %}
+{% set topbar_badge = "Staff View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/staff/dashboard"},
+    {"key": "reservations", "label": "Reservations", "href": "/staff/reservations"},
+    {"key": "open_session", "label": "Open Session", "href": "/staff/open_session"},
+    {"key": "active_sessions", "label": "Active Sessions", "href": "/staff/active_sessions"},
+    {"key": "orders", "label": "Orders", "href": "/staff/orders"},
+    {"key": "logout", "label": "Logout", "href": "/logout"}
+] %}
+
+{% block title %}Open Dining Session{% endblock %}
+
+{% block content %}
+{% if success %}
+<div class="alert alert-success">
+    {{ success }}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
+<section class="hero">
+    <div>
+        <h2>Seat Guests</h2>
+        <p>
+            Open a dining session from a confirmed reservation or seat a walk-in customer at an available table.
+            SQL Server validates the branch, table status, and session rules.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/staff/active_sessions" class="btn-primary">Active Sessions</a>
+        <a href="/staff/reservations" class="btn-secondary">Reservations</a>
+    </div>
+</section>
+
+<section class="grid">
+    <div class="panel">
+        <h2>From Confirmed Reservation</h2>
+        <p>Select a confirmed reservation that does not already have a dining session.</p>
+
+        <form method="post" action="/staff/open_session/reservation" class="stacked-form">
+            <div class="form-group">
+                <label for="reservation_id">Confirmed Reservation</label>
+                <select id="reservation_id" name="reservation_id" required>
+                    <option value="">Select Reservation</option>
+                    {% for reservation in confirmed_reservations %}
+                    <option
+                        value="{{ reservation.reservation_id }}"
+                        {% if form_data.get('reservation_id') == reservation.reservation_id|string %}selected{% endif %}
+                    >
+                        #{{ reservation.reservation_id }} - {{ reservation.customer_name }} - {{ reservation.table_number }} ({{ reservation.area_name }}) - {{ reservation.reservation_datetime }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" {% if not confirmed_reservations %}disabled{% endif %}>
+                Open Reserved Session
+            </button>
+        </form>
+
+        {% if not confirmed_reservations %}
+        <div class="empty-state">
+            <h3>No confirmed reservations ready</h3>
+            <p>Confirm a pending reservation before opening a reservation-based dining session.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="panel">
+        <h2>Walk-In Session</h2>
+        <p>Create or reuse a customer by phone, then seat them at an available table.</p>
+
+        <form method="post" action="/staff/open_session/walkin" class="form-grid">
+            <div class="form-group">
+                <label for="full_name">Customer Name</label>
+                <input
+                    type="text"
+                    id="full_name"
+                    name="full_name"
+                    value="{{ form_data.get('full_name', '') }}"
+                    placeholder="Enter customer name"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone</label>
+                <input
+                    type="text"
+                    id="phone"
+                    name="phone"
+                    value="{{ form_data.get('phone', '') }}"
+                    placeholder="010-xxxx-xxxx"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value="{{ form_data.get('email', '') }}"
+                    placeholder="optional@email.com"
+                >
+            </div>
+
+            <div class="form-group form-group-wide">
+                <label for="table_id">Available Table</label>
+                <select id="table_id" name="table_id" required>
+                    <option value="">Select Table</option>
+                    {% for table in available_tables %}
+                    <option
+                        value="{{ table.table_id }}"
+                        {% if form_data.get('table_id') == table.table_id|string %}selected{% endif %}
+                    >
+                        {{ table.table_number }} - {{ table.area_name }} (Capacity {{ table.capacity }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" {% if not available_tables %}disabled{% endif %}>
+                    Open Walk-In Session
+                </button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}

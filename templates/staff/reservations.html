@@ -11,6 +11,7 @@
 {% set nav_links = [
     {"key": "dashboard", "label": "Dashboard", "href": "/staff/dashboard"},
     {"key": "reservations", "label": "Reservations", "href": "/staff/reservations"},
+    {"key": "open_session", "label": "Open Session", "href": "/staff/open_session"},
     {"key": "active_sessions", "label": "Active Sessions", "href": "/staff/active_sessions"},
     {"key": "orders", "label": "Orders", "href": "/staff/orders"},
     {"key": "logout", "label": "Logout", "href": "/logout"}
@@ -40,6 +41,7 @@
         </p>
     </div>
     <div class="hero-actions">
+        <a href="/staff/open_session" class="btn-primary">Open Session</a>
         <a href="/staff/active_sessions" class="btn-primary">Active Sessions</a>
         <a href="/staff/dashboard" class="btn-secondary">Back to Dashboard</a>
     </div>
@@ -106,6 +108,7 @@
                     <th>Date &amp; Time</th>
                     <th>Party</th>
                     <th>Reservation</th>
+                    <th>Session</th>
                     <th>Table Status</th>
                     <th>Actions</th>
                 </tr>
@@ -132,7 +135,17 @@
                             {{ reservation.reservation_status }}
                         </span>
                     </td>
-                    <td>{{ reservation.table_status }}</td>
+                    <td>
+                        {% if reservation.session_id %}
+                        {% set session_status = reservation.session_status|lower %}
+                        <span class="badge {% if session_status == 'open' %}open{% elif session_status == 'closed' %}closed{% else %}pending{% endif %}">
+                            #{{ reservation.session_id }} {{ reservation.session_status }}
+                        </span>
+                        {% else %}
+                        <span class="muted-text">Not seated</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ reservation.effective_table_status }}</td>
                     <td>
                         <div class="action-row">
                             {% if reservation.reservation_status == 'Pending' %}
@@ -144,7 +157,12 @@
                                 <input type="hidden" name="new_status" value="Cancelled">
                                 <button type="submit" class="btn btn-secondary">Cancel</button>
                             </form>
+                            {% elif reservation.reservation_status == 'Confirmed' and reservation.session_status == 'Open' %}
+                            <span class="muted-text">In Session</span>
+                            {% elif reservation.reservation_status == 'Confirmed' and reservation.session_id %}
+                            <span class="muted-text">Session Closed</span>
                             {% elif reservation.reservation_status == 'Confirmed' %}
+                            <a href="/staff/open_session?reservation_id={{ reservation.reservation_id }}" class="btn btn-primary">Open</a>
                             <form method="post" action="/staff/reservations/{{ reservation.reservation_id }}/status">
                                 <input type="hidden" name="new_status" value="Cancelled">
                                 <button type="submit" class="btn btn-secondary">Cancel</button>
