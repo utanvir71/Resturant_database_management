@@ -20,6 +20,18 @@
 {% block title %}Order #{{ order.order_id }}{% endblock %}
 
 {% block content %}
+{% if success %}
+<div class="alert alert-success">
+    {{ success }}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
 <section class="hero">
     <div>
         <h2>Order #{{ order.order_id }}</h2>
@@ -50,6 +62,69 @@
     <div class="summary-card">
         <h3>Total</h3>
         <p>{{ "%.2f"|format(total_amount) }}</p>
+    </div>
+</section>
+
+<section class="grid">
+    <div class="panel">
+        <h2>Update Order Status</h2>
+        {% if order.order_status in ['Placed', 'Preparing'] and not order.payment_id %}
+        <div class="action-row">
+            {% if order.order_status == 'Placed' %}
+            <form method="post" action="/staff/orders/{{ order.order_id }}/status">
+                <input type="hidden" name="new_status" value="Preparing">
+                <button type="submit" class="btn btn-primary">Mark Preparing</button>
+            </form>
+            {% endif %}
+
+            <form method="post" action="/staff/orders/{{ order.order_id }}/status">
+                <input type="hidden" name="new_status" value="Served">
+                <button type="submit" class="btn btn-primary">Mark Served</button>
+            </form>
+
+            <form method="post" action="/staff/orders/{{ order.order_id }}/status">
+                <input type="hidden" name="new_status" value="Cancelled">
+                <button type="submit" class="btn btn-secondary">Cancel Order</button>
+            </form>
+        </div>
+        {% elif order.payment_id %}
+        <p class="muted-text">This order already has a payment record, so status changes are locked.</p>
+        {% else %}
+        <p class="muted-text">No status actions are available for this order.</p>
+        {% endif %}
+    </div>
+
+    <div class="panel">
+        <h2>Record Payment</h2>
+        {% if not order.payment_id and order.order_status != 'Cancelled' %}
+        <form method="post" action="/staff/orders/{{ order.order_id }}/payment" class="stacked-form">
+            <div class="form-group">
+                <label for="payment_method">Payment Method</label>
+                <select id="payment_method" name="payment_method" required>
+                    <option value="">Select Method</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Card">Card</option>
+                    <option value="MobilePayment">Mobile Payment</option>
+                </select>
+            </div>
+            <div class="form-actions form-actions-inline">
+                <button type="submit" class="btn btn-primary">Record Payment</button>
+            </div>
+        </form>
+        {% elif order.payment_id %}
+        <div class="stats-list">
+            <div class="stats-item">
+                <span>Paid Amount</span>
+                <span>{{ "%.2f"|format(order.amount_paid) }}</span>
+            </div>
+            <div class="stats-item">
+                <span>Paid At</span>
+                <span>{{ order.payment_datetime }}</span>
+            </div>
+        </div>
+        {% else %}
+        <p class="muted-text">Cancelled orders cannot be paid.</p>
+        {% endif %}
     </div>
 </section>
 

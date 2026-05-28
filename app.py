@@ -1134,10 +1134,72 @@ def staff_order_details(order_id):
             "staff/order_details.html",
             order=order,
             order_items=order_items,
-            total_amount=total_amount
+            total_amount=total_amount,
+            success=request.args.get("success"),
+            error=request.args.get("error")
         )
     except Exception as e:
         return f"<h1>Order Details Error</h1><pre>{str(e)}</pre>"
+
+
+@app.route("/staff/orders/<int:order_id>/status", methods=["POST"])
+@require_role("staff")
+def staff_update_order_status(order_id):
+    new_status = request.form.get("new_status", "")
+
+    try:
+        execute_query("""
+            EXEC dbo.sp_UpdateOrderStatus
+                @order_id = %s,
+                @staff_branch_id = %s,
+                @new_status = %s
+        """, (
+            order_id,
+            current_staff_branch_id(),
+            new_status
+        ))
+
+        return redirect(url_for(
+            "staff_order_details",
+            order_id=order_id,
+            success=f"Order marked as {new_status}."
+        ))
+    except Exception as e:
+        return redirect(url_for(
+            "staff_order_details",
+            order_id=order_id,
+            error=clean_db_error(e)
+        ))
+
+
+@app.route("/staff/orders/<int:order_id>/payment", methods=["POST"])
+@require_role("staff")
+def staff_record_order_payment(order_id):
+    payment_method = request.form.get("payment_method", "")
+
+    try:
+        execute_query("""
+            EXEC dbo.sp_RecordOrderPayment
+                @order_id = %s,
+                @staff_branch_id = %s,
+                @payment_method = %s
+        """, (
+            order_id,
+            current_staff_branch_id(),
+            payment_method
+        ))
+
+        return redirect(url_for(
+            "staff_order_details",
+            order_id=order_id,
+            success="Payment recorded."
+        ))
+    except Exception as e:
+        return redirect(url_for(
+            "staff_order_details",
+            order_id=order_id,
+            error=clean_db_error(e)
+        ))
 
 
 @app.route("/staff/take_order", methods=["GET", "POST"])

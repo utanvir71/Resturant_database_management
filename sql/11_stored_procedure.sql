@@ -566,6 +566,195 @@ BEGIN
 END;
 GO
 
+/* ============================================================
+   Stored Procedure: Update Order Status
+   Purpose:
+   - Enforce staff branch ownership for order status updates.
+   - Control a simple service workflow: Placed -> Preparing -> Served.
+   - Allow cancellation before an order is served or paid.
+   ============================================================ */
+
+CREATE OR ALTER PROCEDURE dbo.sp_UpdateOrderStatus
+    @order_id INT,
+    @staff_branch_id INT,
+    @new_status VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE
+        @current_status VARCHAR(20),
+        @order_branch_id INT,
+        @payment_id INT;
+
+    SELECT
+        @current_status = o.order_status,
+        @order_branch_id = da.branch_id,
+        @payment_id = p.payment_id
+    FROM [Orders] o
+    JOIN Dining_Sessions ds ON o.session_id = ds.session_id
+    JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+    JOIN Dining_Areas da ON rt.area_id = da.area_id
+    LEFT JOIN Payments p ON o.order_id = p.order_id
+    WHERE o.order_id = @order_id;
+
+    IF @current_status IS NULL
+    BEGIN
+        RAISERROR('Order not found.', 16, 1);
+        RETURN;
+    END;
+
+    IF @order_branch_id <> @staff_branch_id
+    BEGIN
+        RAISERROR('This order does not belong to the staff member''s branch.', 16, 1);
+        RETURN;
+    END;
+
+    IF @new_status NOT IN ('Preparing', 'Served', 'Cancelled')
+    BEGIN
+        RAISERROR('Invalid order status update.', 16, 1);
+        RETURN;
+    END;
+
+    IF @current_status = 'Cancelled'
+    BEGIN
+        RAISERROR('Cancelled orders cannot be changed.', 16, 1);
+        RETURN;
+    END;
+
+    IF @current_status = 'Served' AND @new_status <> 'Cancelled'
+    BEGIN
+        RAISERROR('Served orders are already final for preparation workflow.', 16, 1);
+        RETURN;
+    END;
+
+    IF @new_status = 'Preparing' AND @current_status <> 'Placed'
+    BEGIN
+        RAISERROR('Only placed orders can be marked as preparing.', 16, 1);
+        RETURN;
+    END;
+
+    IF @new_status = 'Served' AND @current_status NOT IN ('Placed', 'Preparing')
+    BEGIN
+        RAISERROR('Only placed or preparing orders can be marked as served.', 16, 1);
+        RETURN;
+    END;
+
+    IF @new_status = 'Cancelled'
+    BEGIN
+        IF @current_status = 'Served'
+        BEGIN
+            RAISERROR('Served orders should not be cancelled from this workflow.', 16, 1);
+            RETURN;
+        END;
+
+        IF @payment_id IS NOT NULL
+        BEGIN
+            RAISERROR('Paid orders cannot be cancelled.', 16, 1);
+            RETURN;
+        END;
+    END;
+
+    UPDATE [Orders]
+    SET order_status = @new_status
+    WHERE order_id = @order_id;
+END;
+GO
+
+/* ============================================================
+   Stored Procedure: Record Order Payment
+   Purpose:
+   - Calculate the amount from Order_Items.
+   - Prevent duplicate payments for the same order.
+   - Insert one payment row for the order.
+   ============================================================ */
+
+CREATE OR ALTER PROCEDURE dbo.sp_RecordOrderPayment
+    @order_id INT,
+    @staff_branch_id INT,
+    @payment_method VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE
+        @order_branch_id INT,
+        @order_status VARCHAR(20),
+        @amount_paid DECIMAL(10,2);
+
+    SELECT
+        @order_branch_id = da.branch_id,
+        @order_status = o.order_status
+    FROM [Orders] o
+    JOIN Dining_Sessions ds ON o.session_id = ds.session_id
+    JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+    JOIN Dining_Areas da ON rt.area_id = da.area_id
+    WHERE o.order_id = @order_id;
+
+    IF @order_branch_id IS NULL
+    BEGIN
+        RAISERROR('Order not found.', 16, 1);
+        RETURN;
+    END;
+
+    IF @order_branch_id <> @staff_branch_id
+    BEGIN
+        RAISERROR('This order does not belong to the staff member''s branch.', 16, 1);
+        RETURN;
+    END;
+
+    IF @order_status = 'Cancelled'
+    BEGIN
+        RAISERROR('Cancelled orders cannot be paid.', 16, 1);
+        RETURN;
+    END;
+
+    IF @payment_method NOT IN ('Cash', 'Card', 'MobilePayment')
+    BEGIN
+        RAISERROR('Invalid payment method.', 16, 1);
+        RETURN;
+    END;
+
+    IF EXISTS (
+        SELECT 1
+        FROM Payments
+        WHERE order_id = @order_id
+    )
+    BEGIN
+        RAISERROR('This order already has a payment record.', 16, 1);
+        RETURN;
+    END;
+
+    SELECT
+        @amount_paid = COALESCE(SUM(quantity * agreed_unit_price), 0)
+    FROM Order_Items
+    WHERE order_id = @order_id;
+
+    IF @amount_paid <= 0
+    BEGIN
+        RAISERROR('Cannot record payment for an order without billable items.', 16, 1);
+        RETURN;
+    END;
+
+    INSERT INTO Payments (
+        order_id,
+        payment_method,
+        amount_paid,
+        payment_datetime,
+        payment_status
+    )
+    VALUES (
+        @order_id,
+        @payment_method,
+        @amount_paid,
+        GETDATE(),
+        'Paid'
+    );
+END;
+GO
+
 
 
 EXEC dbo.sp_SyncTableStatuses;
@@ -578,4 +767,3 @@ JOIN Dining_Sessions ds
     ON r.reservation_id = ds.reservation_id
 WHERE ds.session_status = 'Closed'
   AND r.reservation_status = 'Confirmed';
-
