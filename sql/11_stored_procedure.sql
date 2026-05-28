@@ -391,3 +391,191 @@ BEGIN
     COMMIT TRANSACTION;
 END;
 GO
+
+/* ============================================================
+   Stored Procedure: Create Order With Items
+   Purpose:
+   - Create one order for an open dining session.
+   - Insert multiple related order items in the same transaction.
+   - Copy the current branch menu price into agreed_unit_price.
+   ============================================================ */
+
+CREATE OR ALTER PROCEDURE dbo.sp_CreateOrderWithItems
+    @session_id INT,
+    @staff_id INT,
+    @staff_branch_id INT,
+    @items_json NVARCHAR(MAX)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE
+        @session_branch_id INT,
+        @session_status VARCHAR(20),
+        @staff_actual_branch_id INT,
+        @staff_status VARCHAR(20),
+        @order_id INT;
+
+    DECLARE @RawItems TABLE (
+        item_id INT NULL,
+        quantity INT NULL
+    );
+
+    DECLARE @OrderItems TABLE (
+        item_id INT NOT NULL PRIMARY KEY,
+        quantity INT NOT NULL
+    );
+
+    SELECT
+        @session_branch_id = da.branch_id,
+        @session_status = ds.session_status
+    FROM Dining_Sessions ds
+    JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+    JOIN Dining_Areas da ON rt.area_id = da.area_id
+    WHERE ds.session_id = @session_id;
+
+    IF @session_branch_id IS NULL
+    BEGIN
+        RAISERROR('Dining session not found.', 16, 1);
+        RETURN;
+    END;
+
+    IF @session_status <> 'Open'
+    BEGIN
+        RAISERROR('Orders can only be created for open dining sessions.', 16, 1);
+        RETURN;
+    END;
+
+    IF @session_branch_id <> @staff_branch_id
+    BEGIN
+        RAISERROR('This dining session does not belong to the staff member''s branch.', 16, 1);
+        RETURN;
+    END;
+
+    SELECT
+        @staff_actual_branch_id = branch_id,
+        @staff_status = staff_status
+    FROM Staff
+    WHERE staff_id = @staff_id;
+
+    IF @staff_actual_branch_id IS NULL
+    BEGIN
+        RAISERROR('Staff member not found.', 16, 1);
+        RETURN;
+    END;
+
+    IF @staff_status <> 'Active'
+    BEGIN
+        RAISERROR('Inactive staff members cannot create orders.', 16, 1);
+        RETURN;
+    END;
+
+    IF @staff_actual_branch_id <> @staff_branch_id
+    BEGIN
+        RAISERROR('Staff member does not belong to the selected branch.', 16, 1);
+        RETURN;
+    END;
+
+    IF ISJSON(@items_json) <> 1
+    BEGIN
+        RAISERROR('Order item data is not valid JSON.', 16, 1);
+        RETURN;
+    END;
+
+    INSERT INTO @RawItems (item_id, quantity)
+    SELECT item_id, quantity
+    FROM OPENJSON(@items_json)
+    WITH (
+        item_id INT '$.item_id',
+        quantity INT '$.quantity'
+    );
+
+    IF NOT EXISTS (SELECT 1 FROM @RawItems)
+    BEGIN
+        RAISERROR('At least one menu item is required.', 16, 1);
+        RETURN;
+    END;
+
+    IF EXISTS (
+        SELECT 1
+        FROM @RawItems
+        WHERE item_id IS NULL
+           OR quantity IS NULL
+           OR quantity <= 0
+    )
+    BEGIN
+        RAISERROR('Every order item must have a valid menu item and positive quantity.', 16, 1);
+        RETURN;
+    END;
+
+    INSERT INTO @OrderItems (item_id, quantity)
+    SELECT item_id, SUM(quantity)
+    FROM @RawItems
+    GROUP BY item_id;
+
+    IF EXISTS (
+        SELECT 1
+        FROM @OrderItems oi
+        LEFT JOIN Branch_Menu_Items bmi
+            ON oi.item_id = bmi.item_id
+           AND bmi.branch_id = @staff_branch_id
+           AND bmi.availability_status = 'Available'
+        WHERE bmi.item_id IS NULL
+    )
+    BEGIN
+        RAISERROR('One or more selected menu items are not available at this branch.', 16, 1);
+        RETURN;
+    END;
+
+    BEGIN TRANSACTION;
+
+    INSERT INTO [Orders] (
+        session_id,
+        staff_id,
+        order_datetime,
+        order_status
+    )
+    VALUES (
+        @session_id,
+        @staff_id,
+        GETDATE(),
+        'Placed'
+    );
+
+    SET @order_id = SCOPE_IDENTITY();
+
+    INSERT INTO Order_Items (
+        order_id,
+        item_id,
+        quantity,
+        agreed_unit_price
+    )
+    SELECT
+        @order_id,
+        oi.item_id,
+        oi.quantity,
+        bmi.price
+    FROM @OrderItems oi
+    JOIN Branch_Menu_Items bmi
+        ON oi.item_id = bmi.item_id
+       AND bmi.branch_id = @staff_branch_id
+       AND bmi.availability_status = 'Available';
+
+    COMMIT TRANSACTION;
+END;
+GO
+
+
+
+EXEC dbo.sp_SyncTableStatuses;
+
+
+UPDATE r
+SET r.reservation_status = 'Completed'
+FROM Reservations r
+JOIN Dining_Sessions ds
+    ON r.reservation_id = ds.reservation_id
+WHERE ds.session_status = 'Closed'
+  AND r.reservation_status = 'Confirmed';
+

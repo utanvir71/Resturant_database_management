@@ -89,6 +89,7 @@
                     <th>Reservation ID</th>
                     <th>Session Start</th>
                     <th>Status</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -106,6 +107,9 @@
                         <span class="badge {% if status == 'open' %}open{% elif status == 'closed' %}closed{% else %}pending{% endif %}">
                             {{ session.session_status }}
                         </span>
+                    </td>
+                    <td>
+                        <a href="/staff/take_order?session_id={{ session.session_id }}" class="btn btn-primary">Take Order</a>
                     </td>
                 </tr>
                 {% endfor %}

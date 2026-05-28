@@ -20,6 +20,18 @@
 {% block title %}Staff Orders{% endblock %}
 
 {% block content %}
+{% if success %}
+<div class="alert alert-success">
+    {{ success }}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
 <section class="hero">
     <div>
         <h2>Order Operations</h2>
@@ -29,6 +41,7 @@
         </p>
     </div>
     <div class="hero-actions">
+        <a href="/staff/take_order" class="btn-primary">Take Order</a>
         <a href="/staff/active_sessions" class="btn-primary">View Active Sessions</a>
         <a href="/staff/dashboard" class="btn-secondary">Back to Dashboard</a>
     </div>

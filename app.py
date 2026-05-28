@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from functools import wraps
 
@@ -72,6 +73,50 @@ def load_make_reservation_context(error=None, form_data=None):
         "tables": get_available_tables(),
         "error": error,
         "form_data": form_data or {},
+    }
+
+
+def load_take_order_context(error=None, form_data=None, selected_session_id=None):
+    branch_id = current_staff_branch_id()
+
+    active_sessions = fetch_all("""
+        SELECT
+            ds.session_id,
+            c.full_name AS customer_name,
+            b.branch_name,
+            da.area_name,
+            rt.table_number,
+            ds.session_start
+        FROM Dining_Sessions ds
+        JOIN Customers c ON ds.customer_id = c.customer_id
+        JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+        JOIN Dining_Areas da ON rt.area_id = da.area_id
+        JOIN Branches b ON da.branch_id = b.branch_id
+        WHERE ds.session_status = 'Open'
+          AND b.branch_id = %s
+        ORDER BY ds.session_start DESC
+    """, (branch_id,))
+
+    menu_items = fetch_all("""
+        SELECT
+            mi.item_id,
+            mi.item_name,
+            mc.category_name,
+            bmi.price
+        FROM Branch_Menu_Items bmi
+        JOIN Menu_Items mi ON bmi.item_id = mi.item_id
+        JOIN Menu_Categories mc ON mi.category_id = mc.category_id
+        WHERE bmi.branch_id = %s
+          AND bmi.availability_status = 'Available'
+        ORDER BY mc.category_name, mi.item_name
+    """, (branch_id,))
+
+    return {
+        "active_sessions": active_sessions,
+        "menu_items": menu_items,
+        "error": error,
+        "form_data": form_data or {},
+        "selected_session_id": str(selected_session_id or ""),
     }
 
 
@@ -1012,10 +1057,114 @@ def staff_orders():
             "staff/orders.html",
             orders=orders,
             statuses=statuses,
-            selected_status=selected_status
+            selected_status=selected_status,
+            success=request.args.get("success"),
+            error=request.args.get("error")
         )
     except Exception as e:
         return f"<h1>Staff Orders Error</h1><pre>{str(e)}</pre>"
+
+
+@app.route("/staff/take_order", methods=["GET", "POST"])
+@require_role("staff")
+def staff_take_order():
+    if request.method == "GET":
+        return render_template(
+            "staff/take_order.html",
+            **load_take_order_context(
+                selected_session_id=request.args.get("session_id", "")
+            )
+        )
+
+    form_data = request.form.to_dict(flat=False)
+    selected_session_id = request.form.get("session_id", "")
+
+    try:
+        session_id = int(selected_session_id)
+    except ValueError:
+        return render_template(
+            "staff/take_order.html",
+            **load_take_order_context(
+                error="Please select an open dining session.",
+                form_data=form_data,
+                selected_session_id=selected_session_id
+            )
+        )
+
+    raw_item_ids = request.form.getlist("item_id")
+    raw_quantities = request.form.getlist("quantity")
+    items = []
+
+    for item_id, quantity in zip(raw_item_ids, raw_quantities):
+        if not item_id:
+            continue
+
+        try:
+            parsed_item_id = int(item_id)
+            parsed_quantity = int(quantity)
+        except ValueError:
+            return render_template(
+                "staff/take_order.html",
+                **load_take_order_context(
+                    error="Each selected menu item needs a valid quantity.",
+                    form_data=form_data,
+                    selected_session_id=selected_session_id
+                )
+            )
+
+        if parsed_quantity <= 0:
+            return render_template(
+                "staff/take_order.html",
+                **load_take_order_context(
+                    error="Order quantities must be greater than zero.",
+                    form_data=form_data,
+                    selected_session_id=selected_session_id
+                )
+            )
+
+        items.append({
+            "item_id": parsed_item_id,
+            "quantity": parsed_quantity,
+        })
+
+    if not items:
+        return render_template(
+            "staff/take_order.html",
+            **load_take_order_context(
+                error="Please select at least one menu item.",
+                form_data=form_data,
+                selected_session_id=selected_session_id
+            )
+        )
+
+    try:
+        execute_query("""
+            EXEC dbo.sp_CreateOrderWithItems
+                @session_id = %s,
+                @staff_id = %s,
+                @staff_branch_id = %s,
+                @items_json = %s
+        """, (
+            session_id,
+            int(session["staff_id"]),
+            current_staff_branch_id(),
+            json.dumps(items)
+        ))
+
+        return redirect(url_for(
+            "staff_orders",
+            success="Order created with multiple menu items."
+        ))
+    except Exception as e:
+        return render_template(
+            "staff/take_order.html",
+            **load_take_order_context(
+                error=clean_db_error(e),
+                form_data=form_data,
+                selected_session_id=selected_session_id
+            )
+        )
+
 
 @app.route("/staff/active_sessions")
 @require_role("staff")
