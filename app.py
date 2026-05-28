@@ -120,6 +120,70 @@ def load_take_order_context(error=None, form_data=None, selected_session_id=None
     }
 
 
+def load_admin_menu_context(error=None, form_data=None):
+    selected_branch = request.args.get("branch", "")
+    selected_category = request.args.get("category", "")
+    selected_availability = request.args.get("availability", "")
+
+    branches = get_branches()
+    categories = fetch_all("""
+        SELECT category_id, category_name
+        FROM Menu_Categories
+        ORDER BY category_name
+    """)
+
+    query = """
+    SELECT
+        mi.item_id,
+        mi.item_name,
+        mi.calories,
+        mi.description,
+        mc.category_name,
+        b.branch_id,
+        b.branch_name,
+        bmi.price,
+        bmi.availability_status,
+        (
+            SELECT COUNT(*)
+            FROM Order_Items oi
+            WHERE oi.item_id = mi.item_id
+        ) AS order_count
+    FROM Branch_Menu_Items bmi
+    JOIN Menu_Items mi ON bmi.item_id = mi.item_id
+    JOIN Menu_Categories mc ON mi.category_id = mc.category_id
+    JOIN Branches b ON bmi.branch_id = b.branch_id
+    WHERE 1=1
+    """
+    params = []
+
+    if selected_branch:
+        query += " AND b.branch_id = %s"
+        params.append(int(selected_branch))
+
+    if selected_category:
+        query += " AND mc.category_id = %s"
+        params.append(int(selected_category))
+
+    if selected_availability:
+        query += " AND bmi.availability_status = %s"
+        params.append(selected_availability)
+
+    query += " ORDER BY b.branch_name, mc.category_name, mi.item_name"
+    menu_items = fetch_all(query, tuple(params))
+
+    return {
+        "menu_items": menu_items,
+        "branches": branches,
+        "categories": categories,
+        "selected_branch": selected_branch,
+        "selected_category": selected_category,
+        "selected_availability": selected_availability,
+        "success": request.args.get("success"),
+        "error": error or request.args.get("error"),
+        "form_data": form_data or {},
+    }
+
+
 @app.route("/")
 def home():
     return render_template(
@@ -287,6 +351,99 @@ def admin_reservations():
         )
     except Exception as e:
         return f"<h1>Reservations Page Error</h1><pre>{str(e)}</pre>"
+
+
+@app.route("/admin/menu", methods=["GET", "POST"])
+@require_role("admin")
+def admin_menu():
+    if request.method == "GET":
+        try:
+            return render_template(
+                "admin/menu.html",
+                **load_admin_menu_context()
+            )
+        except Exception as e:
+            return f"<h1>Admin Menu Page Error</h1><pre>{str(e)}</pre>"
+
+    form_data = request.form.to_dict()
+
+    try:
+        calories_raw = request.form.get("calories", "").strip()
+        calories = int(calories_raw) if calories_raw else None
+
+        execute_query("""
+            EXEC dbo.sp_AdminAddMenuItem
+                @category_id = %s,
+                @item_name = %s,
+                @calories = %s,
+                @description = %s,
+                @branch_id = %s,
+                @price = %s,
+                @availability_status = %s
+        """, (
+            int(request.form.get("category_id", "")),
+            request.form.get("item_name", "").strip(),
+            calories,
+            request.form.get("description", "").strip() or None,
+            int(request.form.get("branch_id", "")),
+            float(request.form.get("price", "")),
+            request.form.get("availability_status", "")
+        ))
+
+        return redirect(url_for(
+            "admin_menu",
+            success="Menu item added to branch menu."
+        ))
+    except ValueError:
+        return render_template(
+            "admin/menu.html",
+            **load_admin_menu_context(
+                error="Please enter valid category, branch, calories, and price values.",
+                form_data=form_data
+            )
+        )
+    except Exception as e:
+        return render_template(
+            "admin/menu.html",
+            **load_admin_menu_context(
+                error=clean_db_error(e),
+                form_data=form_data
+            )
+
+        )
+
+
+@app.route("/admin/menu/<int:branch_id>/<int:item_id>/update", methods=["POST"])
+@require_role("admin")
+def admin_update_menu_item(branch_id, item_id):
+    try:
+        execute_query("""
+            EXEC dbo.sp_AdminUpdateBranchMenuItem
+                @branch_id = %s,
+                @item_id = %s,
+                @price = %s,
+                @availability_status = %s
+        """, (
+            branch_id,
+            item_id,
+            float(request.form.get("price", "")),
+            request.form.get("availability_status", "")
+        ))
+
+        return redirect(url_for(
+            "admin_menu",
+            success="Branch menu item updated."
+        ))
+    except ValueError:
+        return redirect(url_for(
+            "admin_menu",
+            error="Please enter a valid price."
+        ))
+    except Exception as e:
+        return redirect(url_for(
+            "admin_menu",
+            error=clean_db_error(e)
+        ))
 
 
 @app.route("/customer/dashboard")

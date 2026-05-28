@@ -846,6 +846,174 @@ BEGIN
 END;
 GO
 
+/* ============================================================
+   Stored Procedure: Admin Add Menu Item
+   Purpose:
+   - Create a menu item once in Menu_Items.
+   - Assign it to one branch with price and availability.
+   - Keep both inserts in one transaction.
+   ============================================================ */
+
+CREATE OR ALTER PROCEDURE dbo.sp_AdminAddMenuItem
+    @category_id INT,
+    @item_name VARCHAR(100),
+    @calories INT = NULL,
+    @description VARCHAR(255) = NULL,
+    @branch_id INT,
+    @price DECIMAL(10,2),
+    @availability_status VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @item_id INT;
+
+    SET @item_name = LTRIM(RTRIM(@item_name));
+    SET @description = NULLIF(LTRIM(RTRIM(@description)), '');
+
+    IF @item_name = ''
+    BEGIN
+        RAISERROR('Menu item name is required.', 16, 1);
+        RETURN;
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM Menu_Categories
+        WHERE category_id = @category_id
+    )
+    BEGIN
+        RAISERROR('Selected menu category does not exist.', 16, 1);
+        RETURN;
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM Branches
+        WHERE branch_id = @branch_id
+    )
+    BEGIN
+        RAISERROR('Selected branch does not exist.', 16, 1);
+        RETURN;
+    END;
+
+    IF @calories IS NOT NULL AND @calories < 0
+    BEGIN
+        RAISERROR('Calories cannot be negative.', 16, 1);
+        RETURN;
+    END;
+
+    IF @price < 0
+    BEGIN
+        RAISERROR('Price cannot be negative.', 16, 1);
+        RETURN;
+    END;
+
+    IF @availability_status NOT IN ('Available', 'Unavailable')
+    BEGIN
+        RAISERROR('Invalid menu availability status.', 16, 1);
+        RETURN;
+    END;
+
+    IF EXISTS (
+        SELECT 1
+        FROM Menu_Items mi
+        JOIN Branch_Menu_Items bmi ON mi.item_id = bmi.item_id
+        WHERE mi.category_id = @category_id
+          AND mi.item_name = @item_name
+          AND bmi.branch_id = @branch_id
+    )
+    BEGIN
+        RAISERROR('This branch already has a menu item with the same name and category.', 16, 1);
+        RETURN;
+    END;
+
+    BEGIN TRANSACTION;
+
+    INSERT INTO Menu_Items (
+        category_id,
+        item_name,
+        calories,
+        description
+    )
+    VALUES (
+        @category_id,
+        @item_name,
+        @calories,
+        @description
+    );
+
+    SET @item_id = SCOPE_IDENTITY();
+
+    INSERT INTO Branch_Menu_Items (
+        branch_id,
+        item_id,
+        price,
+        availability_status
+    )
+    VALUES (
+        @branch_id,
+        @item_id,
+        @price,
+        @availability_status
+    );
+
+    COMMIT TRANSACTION;
+END;
+GO
+
+
+/* ============================================================
+   Stored Procedure: Admin Update Branch Menu Item
+   Purpose:
+   - Update branch-specific menu price and availability.
+   - Keep historical Order_Items unchanged because they store agreed price.
+   - Use Unavailable as the safe remove option for menu history.
+   ============================================================ */
+
+CREATE OR ALTER PROCEDURE dbo.sp_AdminUpdateBranchMenuItem
+    @branch_id INT,
+    @item_id INT,
+    @price DECIMAL(10,2),
+    @availability_status VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM Branch_Menu_Items
+        WHERE branch_id = @branch_id
+          AND item_id = @item_id
+    )
+    BEGIN
+        RAISERROR('Branch menu item was not found.', 16, 1);
+        RETURN;
+    END;
+
+    IF @price < 0
+    BEGIN
+        RAISERROR('Price cannot be negative.', 16, 1);
+        RETURN;
+    END;
+
+    IF @availability_status NOT IN ('Available', 'Unavailable')
+    BEGIN
+        RAISERROR('Invalid menu availability status.', 16, 1);
+        RETURN;
+    END;
+
+    UPDATE Branch_Menu_Items
+    SET
+        price = @price,
+        availability_status = @availability_status
+    WHERE branch_id = @branch_id
+      AND item_id = @item_id;
+END;
+GO
+
 
 
 EXEC dbo.sp_SyncTableStatuses;
