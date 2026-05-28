@@ -109,7 +109,9 @@
                     <th>Items</th>
                     <th>Total</th>
                     <th>Order Status</th>
+                    <th>Payment</th>
                     <th>Session</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -127,7 +129,18 @@
                         {% set status = order.order_status|lower %}
                         <span class="badge {{ status }}">{{ order.order_status }}</span>
                     </td>
+                    <td>
+                        {% if order.payment_status %}
+                        {% set payment_status = order.payment_status|lower %}
+                        <span class="badge {{ payment_status }}">{{ order.payment_status }}</span>
+                        {% else %}
+                        <span class="badge unpaid">Unpaid</span>
+                        {% endif %}
+                    </td>
                     <td>{{ order.session_status }}</td>
+                    <td>
+                        <a href="/staff/orders/{{ order.order_id }}" class="btn btn-primary">Details</a>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

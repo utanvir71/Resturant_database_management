@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% set sidebar_title = "Staff Panel" %}
+{% set sidebar_subtitle = "Track dining sessions, orders, and branch-level service activity." %}
+{% set nav_heading = "Staff Navigation" %}
+{% set active_page = "orders" %}
+{% set page_title = "Order Details" %}
+{% set page_subtitle = "Review the exact menu items, quantities, prices, and payment state for this order." %}
+{% set topbar_badge = "Staff View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/staff/dashboard"},
+    {"key": "reservations", "label": "Reservations", "href": "/staff/reservations"},
+    {"key": "open_session", "label": "Open Session", "href": "/staff/open_session"},
+    {"key": "active_sessions", "label": "Active Sessions", "href": "/staff/active_sessions"},
+    {"key": "orders", "label": "Orders", "href": "/staff/orders"},
+    {"key": "logout", "label": "Logout", "href": "/logout"}
+] %}
+
+{% block title %}Order #{{ order.order_id }}{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <h2>Order #{{ order.order_id }}</h2>
+        <p>
+            {{ order.customer_name }} at {{ order.branch_name }},
+            {{ order.area_name }} / Table {{ order.table_number }}.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/staff/orders" class="btn-secondary">Back to Orders</a>
+        <a href="/staff/take_order?session_id={{ order.session_id }}" class="btn-primary">Add New Order</a>
+    </div>
+</section>
+
+<section class="summary-cards">
+    <div class="summary-card">
+        <h3>Order Status</h3>
+        <p>{{ order.order_status }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Payment</h3>
+        <p>{{ order.payment_status if order.payment_status else 'Unpaid' }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Items</h3>
+        <p>{{ order_items|length }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Total</h3>
+        <p>{{ "%.2f"|format(total_amount) }}</p>
+    </div>
+</section>
+
+<section class="grid panel-spaced">
+    <div class="panel">
+        <h2>Order Information</h2>
+        <div class="stats-list">
+            <div class="stats-item">
+                <span>Order Date</span>
+                <span>{{ order.order_datetime }}</span>
+            </div>
+            <div class="stats-item">
+                <span>Session</span>
+                <span>#{{ order.session_id }} {{ order.session_status }}</span>
+            </div>
+            <div class="stats-item">
+                <span>Staff</span>
+                <span>{{ order.staff_name }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Customer &amp; Payment</h2>
+        <div class="stats-list">
+            <div class="stats-item">
+                <span>Customer</span>
+                <span>{{ order.customer_name }}</span>
+            </div>
+            <div class="stats-item">
+                <span>Phone</span>
+                <span>{{ order.customer_phone }}</span>
+            </div>
+            <div class="stats-item">
+                <span>Payment Method</span>
+                <span>{{ order.payment_method if order.payment_method else 'Not paid yet' }}</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="panel panel-spaced">
+    <div class="table-meta">
+        <div>
+            <h2>What Customer Ordered</h2>
+            <p>Line totals use the stored agreed price from Order_Items, not the current menu price.</p>
+        </div>
+        <p class="reservation-count">{{ order_items|length }} items</p>
+    </div>
+
+    {% if order_items %}
+    <div class="table-wrapper">
+        <table class="compact-table">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Menu Item</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Line Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order_items %}
+                <tr>
+                    <td>{{ item.category_name }}</td>
+                    <td>{{ item.item_name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ "%.2f"|format(item.agreed_unit_price) }}</td>
+                    <td>{{ "%.2f"|format(item.line_total) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="4">Order Total</th>
+                    <th>{{ "%.2f"|format(total_amount) }}</th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No order items found</h3>
+        <p>This order does not currently have any related Order_Items rows.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

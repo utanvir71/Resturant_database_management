@@ -1015,13 +1015,15 @@ def staff_orders():
             o.order_id,
             o.order_datetime,
             o.order_status,
+            o.session_id,
             ds.session_status,
             c.full_name AS customer_name,
             b.branch_name,
             rt.table_number,
             s.full_name AS staff_name,
             COUNT(oi.order_item_id) AS item_count,
-            COALESCE(SUM(oi.quantity * oi.agreed_unit_price), 0) AS total_amount
+            COALESCE(SUM(oi.quantity * oi.agreed_unit_price), 0) AS total_amount,
+            MAX(p.payment_status) AS payment_status
         FROM [Orders] o
         JOIN Dining_Sessions ds ON o.session_id = ds.session_id
         JOIN Customers c ON ds.customer_id = c.customer_id
@@ -1030,6 +1032,7 @@ def staff_orders():
         JOIN Branches b ON da.branch_id = b.branch_id
         JOIN Staff s ON o.staff_id = s.staff_id
         LEFT JOIN Order_Items oi ON o.order_id = oi.order_id
+        LEFT JOIN Payments p ON o.order_id = p.order_id
         WHERE b.branch_id = %s
         """
         params = [branch_id]
@@ -1043,6 +1046,7 @@ def staff_orders():
             o.order_id,
             o.order_datetime,
             o.order_status,
+            o.session_id,
             ds.session_status,
             c.full_name,
             b.branch_name,
@@ -1063,6 +1067,77 @@ def staff_orders():
         )
     except Exception as e:
         return f"<h1>Staff Orders Error</h1><pre>{str(e)}</pre>"
+
+
+@app.route("/staff/orders/<int:order_id>")
+@require_role("staff")
+def staff_order_details(order_id):
+    try:
+        branch_id = current_staff_branch_id()
+
+        order = fetch_one("""
+            SELECT
+                o.order_id,
+                o.order_datetime,
+                o.order_status,
+                o.session_id,
+                ds.session_start,
+                ds.session_end,
+                ds.session_status,
+                c.full_name AS customer_name,
+                c.phone AS customer_phone,
+                b.branch_name,
+                da.area_name,
+                rt.table_number,
+                s.full_name AS staff_name,
+                p.payment_id,
+                p.payment_method,
+                p.amount_paid,
+                p.payment_datetime,
+                p.payment_status
+            FROM [Orders] o
+            JOIN Dining_Sessions ds ON o.session_id = ds.session_id
+            JOIN Customers c ON ds.customer_id = c.customer_id
+            JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+            JOIN Dining_Areas da ON rt.area_id = da.area_id
+            JOIN Branches b ON da.branch_id = b.branch_id
+            JOIN Staff s ON o.staff_id = s.staff_id
+            LEFT JOIN Payments p ON o.order_id = p.order_id
+            WHERE o.order_id = %s
+              AND b.branch_id = %s
+        """, (order_id, branch_id))
+
+        if not order:
+            return redirect(url_for(
+                "staff_orders",
+                error="Order not found for your assigned branch."
+            ))
+
+        order_items = fetch_all("""
+            SELECT
+                oi.order_item_id,
+                mi.item_name,
+                mc.category_name,
+                oi.quantity,
+                oi.agreed_unit_price,
+                oi.quantity * oi.agreed_unit_price AS line_total
+            FROM Order_Items oi
+            JOIN Menu_Items mi ON oi.item_id = mi.item_id
+            JOIN Menu_Categories mc ON mi.category_id = mc.category_id
+            WHERE oi.order_id = %s
+            ORDER BY mc.category_name, mi.item_name
+        """, (order_id,))
+
+        total_amount = sum(item["line_total"] for item in order_items)
+
+        return render_template(
+            "staff/order_details.html",
+            order=order,
+            order_items=order_items,
+            total_amount=total_amount
+        )
+    except Exception as e:
+        return f"<h1>Order Details Error</h1><pre>{str(e)}</pre>"
 
 
 @app.route("/staff/take_order", methods=["GET", "POST"])
