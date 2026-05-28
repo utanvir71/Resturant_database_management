@@ -88,6 +88,8 @@
                     <th>Table</th>
                     <th>Reservation ID</th>
                     <th>Session Start</th>
+                    <th>Orders</th>
+                    <th>Unpaid</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
@@ -102,6 +104,14 @@
                     <td>{{ session.table_number }}</td>
                     <td>{{ session.reservation_id if session.reservation_id else 'Walk-in' }}</td>
                     <td>{{ session.session_start }}</td>
+                    <td>{{ session.total_orders }}</td>
+                    <td>
+                        {% if session.unpaid_orders > 0 %}
+                        <span class="badge pending">{{ session.unpaid_orders }} unpaid</span>
+                        {% else %}
+                        <span class="badge paid">Ready</span>
+                        {% endif %}
+                    </td>
                     <td>
                         {% set status = session.session_status|lower %}
                         <span class="badge {% if status == 'open' %}open{% elif status == 'closed' %}closed{% else %}pending{% endif %}">
@@ -109,7 +119,12 @@
                         </span>
                     </td>
                     <td>
-                        <a href="/staff/take_order?session_id={{ session.session_id }}" class="btn btn-primary">Take Order</a>
+                        <div class="action-row">
+                            <a href="/staff/take_order?session_id={{ session.session_id }}" class="btn btn-primary">Take Order</a>
+                            <form method="post" action="/staff/active_sessions/{{ session.session_id }}/close">
+                                <button type="submit" class="btn btn-secondary">Close</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}

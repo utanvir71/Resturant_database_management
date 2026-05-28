@@ -755,6 +755,97 @@ BEGIN
 END;
 GO
 
+/* ============================================================
+   Stored Procedure: Close Dining Session
+   Purpose:
+   - Close an open dining session after all orders are paid or cancelled.
+   - Release the restaurant table back to Available.
+   - Mark linked reservations as Completed.
+   ============================================================ */
+
+CREATE OR ALTER PROCEDURE dbo.sp_CloseDiningSession
+    @session_id INT,
+    @staff_branch_id INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE
+        @session_status VARCHAR(20),
+        @session_branch_id INT,
+        @table_id INT,
+        @reservation_id INT;
+
+    SELECT
+        @session_status = ds.session_status,
+        @session_branch_id = da.branch_id,
+        @table_id = ds.table_id,
+        @reservation_id = ds.reservation_id
+    FROM Dining_Sessions ds
+    JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+    JOIN Dining_Areas da ON rt.area_id = da.area_id
+    WHERE ds.session_id = @session_id;
+
+    IF @session_status IS NULL
+    BEGIN
+        RAISERROR('Dining session not found.', 16, 1);
+        RETURN;
+    END;
+
+    IF @session_branch_id <> @staff_branch_id
+    BEGIN
+        RAISERROR('This dining session does not belong to the staff member''s branch.', 16, 1);
+        RETURN;
+    END;
+
+    IF @session_status <> 'Open'
+    BEGIN
+        RAISERROR('Only open dining sessions can be closed.', 16, 1);
+        RETURN;
+    END;
+
+    IF EXISTS (
+        SELECT 1
+        FROM [Orders] o
+        WHERE o.session_id = @session_id
+          AND o.order_status <> 'Cancelled'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM Payments p
+              WHERE p.order_id = o.order_id
+                AND p.payment_status = 'Paid'
+          )
+    )
+    BEGIN
+        RAISERROR('This session still has unpaid active orders.', 16, 1);
+        RETURN;
+    END;
+
+    BEGIN TRANSACTION;
+
+    UPDATE Dining_Sessions
+    SET
+        session_status = 'Closed',
+        session_end = GETDATE()
+    WHERE session_id = @session_id;
+
+    UPDATE Restaurant_Tables
+    SET table_status = 'Available'
+    WHERE table_id = @table_id;
+
+    IF @reservation_id IS NOT NULL
+    BEGIN
+        UPDATE Reservations
+        SET reservation_status = 'Completed'
+        WHERE reservation_id = @reservation_id
+          AND reservation_status = 'Confirmed';
+    END;
+
+    COMMIT TRANSACTION;
+END;
+GO
+
 
 
 EXEC dbo.sp_SyncTableStatuses;

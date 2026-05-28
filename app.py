@@ -1317,7 +1317,36 @@ def staff_active_sessions():
                 rt.table_number,
                 ds.reservation_id,
                 ds.session_start,
-                ds.session_status
+                ds.session_status,
+                (
+                    SELECT COUNT(*)
+                    FROM [Orders] o
+                    WHERE o.session_id = ds.session_id
+                ) AS total_orders,
+                (
+                    SELECT COUNT(*)
+                    FROM [Orders] o
+                    WHERE o.session_id = ds.session_id
+                      AND o.order_status <> 'Cancelled'
+                      AND EXISTS (
+                          SELECT 1
+                          FROM Payments p
+                          WHERE p.order_id = o.order_id
+                            AND p.payment_status = 'Paid'
+                      )
+                ) AS paid_orders,
+                (
+                    SELECT COUNT(*)
+                    FROM [Orders] o
+                    WHERE o.session_id = ds.session_id
+                      AND o.order_status <> 'Cancelled'
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM Payments p
+                          WHERE p.order_id = o.order_id
+                            AND p.payment_status = 'Paid'
+                      )
+                ) AS unpaid_orders
             FROM Dining_Sessions ds
             JOIN Customers c
                 ON ds.customer_id = c.customer_id
@@ -1340,6 +1369,31 @@ def staff_active_sessions():
         )
     except Exception as e:
         return f"<h1>Active Sessions Page Error</h1><pre>{str(e)}</pre>"
+
+
+@app.route("/staff/active_sessions/<int:session_id>/close", methods=["POST"])
+@require_role("staff")
+def staff_close_dining_session(session_id):
+    try:
+        execute_query("""
+            EXEC dbo.sp_CloseDiningSession
+                @session_id = %s,
+                @staff_branch_id = %s
+        """, (
+            session_id,
+            current_staff_branch_id()
+        ))
+
+        return redirect(url_for(
+            "staff_active_sessions",
+            success=f"Dining session #{session_id} closed."
+        ))
+    except Exception as e:
+        return redirect(url_for(
+            "staff_active_sessions",
+            error=clean_db_error(e)
+        ))
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=8001)
