@@ -180,6 +180,7 @@
                     <th>Start</th>
                     <th>End</th>
                     <th>Status</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -197,6 +198,16 @@
                         <span class="badge {% if status == 'scheduled' %}pending{% elif status == 'completed' %}paid{% else %}cancelled{% endif %}">
                             {{ shift.shift_status }}
                         </span>
+                    </td>
+                    <td>
+                        <form method="post" action="/admin/shifts/{{ shift.shift_id }}/status" class="action-row">
+                            <select name="shift_status" required>
+                                <option value="Scheduled" {% if shift.shift_status == 'Scheduled' %}selected{% endif %}>Scheduled</option>
+                                <option value="Completed" {% if shift.shift_status == 'Completed' %}selected{% endif %}>Completed</option>
+                                <option value="Cancelled" {% if shift.shift_status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}

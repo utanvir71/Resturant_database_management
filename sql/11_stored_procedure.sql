@@ -1215,6 +1215,43 @@ BEGIN
 END;
 GO
 
+/* ============================================================
+   Stored Procedure: Admin Update Shift Status
+   Purpose:
+   - Update shift workflow status without deleting shift history.
+   - Keep status values aligned with the Shifts table constraint.
+   ============================================================ */
+
+CREATE OR ALTER PROCEDURE dbo.sp_AdminUpdateShiftStatus
+    @shift_id INT,
+    @shift_status VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM Shifts
+        WHERE shift_id = @shift_id
+    )
+    BEGIN
+        RAISERROR('Shift was not found.', 16, 1);
+        RETURN;
+    END;
+
+    IF @shift_status NOT IN ('Scheduled', 'Completed', 'Cancelled')
+    BEGIN
+        RAISERROR('Invalid shift status.', 16, 1);
+        RETURN;
+    END;
+
+    UPDATE Shifts
+    SET shift_status = @shift_status
+    WHERE shift_id = @shift_id;
+END;
+GO
+
 
 
 EXEC dbo.sp_SyncTableStatuses;

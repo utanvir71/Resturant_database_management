@@ -711,6 +711,30 @@ def admin_shifts():
         )
 
 
+@app.route("/admin/shifts/<int:shift_id>/status", methods=["POST"])
+@require_role("admin")
+def admin_update_shift_status(shift_id):
+    try:
+        execute_query("""
+            EXEC dbo.sp_AdminUpdateShiftStatus
+                @shift_id = %s,
+                @shift_status = %s
+        """, (
+            shift_id,
+            request.form.get("shift_status", "")
+        ))
+
+        return redirect(url_for(
+            "admin_shifts",
+            success="Shift status updated."
+        ))
+    except Exception as e:
+        return redirect(url_for(
+            "admin_shifts",
+            error=clean_db_error(e)
+        ))
+
+
 @app.route("/customer/dashboard")
 @require_role("customer")
 def customer_dashboard():
