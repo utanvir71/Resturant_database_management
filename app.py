@@ -1,8 +1,10 @@
+import csv
+import io
 import json
 from datetime import datetime
 from functools import wraps
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, Response, redirect, render_template, request, session, url_for
 from config import Config
 from db import execute_query, fetch_all, fetch_one
 
@@ -423,7 +425,212 @@ def load_admin_analytics_context():
         "payment_methods": payment_methods,
         "feedback_by_branch": feedback_by_branch,
         "session_status": session_status,
+        "export_datasets": EXPORT_DATASETS,
     }
+
+
+EXPORT_DATASETS = {
+    "orders": {
+        "label": "Orders",
+        "filename": "orders_export.csv",
+        "headers": [
+            "order_id",
+            "order_datetime",
+            "order_status",
+            "session_id",
+            "session_status",
+            "branch_name",
+            "table_number",
+            "customer_name",
+            "staff_name",
+            "item_count",
+            "order_total",
+            "payment_status",
+        ],
+        "query": """
+            SELECT
+                o.order_id,
+                o.order_datetime,
+                o.order_status,
+                ds.session_id,
+                ds.session_status,
+                b.branch_name,
+                rt.table_number,
+                c.full_name AS customer_name,
+                s.full_name AS staff_name,
+                COALESCE(SUM(oi.quantity), 0) AS item_count,
+                COALESCE(SUM(oi.quantity * oi.agreed_unit_price), 0) AS order_total,
+                COALESCE(MAX(p.payment_status), 'Unpaid') AS payment_status
+            FROM [Orders] o
+            JOIN Dining_Sessions ds ON o.session_id = ds.session_id
+            JOIN Customers c ON ds.customer_id = c.customer_id
+            JOIN Staff s ON o.staff_id = s.staff_id
+            JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+            JOIN Dining_Areas da ON rt.area_id = da.area_id
+            JOIN Branches b ON da.branch_id = b.branch_id
+            LEFT JOIN Order_Items oi ON o.order_id = oi.order_id
+            LEFT JOIN Payments p ON o.order_id = p.order_id
+            GROUP BY
+                o.order_id,
+                o.order_datetime,
+                o.order_status,
+                ds.session_id,
+                ds.session_status,
+                b.branch_name,
+                rt.table_number,
+                c.full_name,
+                s.full_name
+            ORDER BY o.order_datetime DESC, o.order_id DESC
+        """,
+    },
+    "order_items": {
+        "label": "Order Items",
+        "filename": "order_items_export.csv",
+        "headers": [
+            "order_id",
+            "order_datetime",
+            "branch_name",
+            "item_name",
+            "category_name",
+            "quantity",
+            "agreed_unit_price",
+            "line_total",
+        ],
+        "query": """
+            SELECT
+                o.order_id,
+                o.order_datetime,
+                b.branch_name,
+                mi.item_name,
+                mc.category_name,
+                oi.quantity,
+                oi.agreed_unit_price,
+                oi.quantity * oi.agreed_unit_price AS line_total
+            FROM Order_Items oi
+            JOIN [Orders] o ON oi.order_id = o.order_id
+            JOIN Menu_Items mi ON oi.item_id = mi.item_id
+            JOIN Menu_Categories mc ON mi.category_id = mc.category_id
+            JOIN Dining_Sessions ds ON o.session_id = ds.session_id
+            JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+            JOIN Dining_Areas da ON rt.area_id = da.area_id
+            JOIN Branches b ON da.branch_id = b.branch_id
+            ORDER BY o.order_datetime DESC, o.order_id DESC, mi.item_name
+        """,
+    },
+    "payments": {
+        "label": "Payments",
+        "filename": "payments_export.csv",
+        "headers": [
+            "payment_id",
+            "order_id",
+            "payment_method",
+            "amount_paid",
+            "payment_datetime",
+            "payment_status",
+            "branch_name",
+            "customer_name",
+        ],
+        "query": """
+            SELECT
+                p.payment_id,
+                p.order_id,
+                p.payment_method,
+                p.amount_paid,
+                p.payment_datetime,
+                p.payment_status,
+                b.branch_name,
+                c.full_name AS customer_name
+            FROM Payments p
+            JOIN [Orders] o ON p.order_id = o.order_id
+            JOIN Dining_Sessions ds ON o.session_id = ds.session_id
+            JOIN Customers c ON ds.customer_id = c.customer_id
+            JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+            JOIN Dining_Areas da ON rt.area_id = da.area_id
+            JOIN Branches b ON da.branch_id = b.branch_id
+            ORDER BY p.payment_datetime DESC, p.payment_id DESC
+        """,
+    },
+    "reservations": {
+        "label": "Reservations",
+        "filename": "reservations_export.csv",
+        "headers": [
+            "reservation_id",
+            "customer_name",
+            "phone",
+            "branch_name",
+            "area_name",
+            "table_number",
+            "reservation_datetime",
+            "party_size",
+            "reservation_status",
+        ],
+        "query": """
+            SELECT
+                r.reservation_id,
+                c.full_name AS customer_name,
+                c.phone,
+                b.branch_name,
+                da.area_name,
+                rt.table_number,
+                r.reservation_datetime,
+                r.party_size,
+                r.reservation_status
+            FROM Reservations r
+            JOIN Customers c ON r.customer_id = c.customer_id
+            JOIN Restaurant_Tables rt ON r.table_id = rt.table_id
+            JOIN Dining_Areas da ON rt.area_id = da.area_id
+            JOIN Branches b ON da.branch_id = b.branch_id
+            ORDER BY r.reservation_datetime DESC, r.reservation_id DESC
+        """,
+    },
+    "feedback": {
+        "label": "Feedback",
+        "filename": "feedback_export.csv",
+        "headers": [
+            "feedback_id",
+            "session_id",
+            "customer_name",
+            "branch_name",
+            "rating",
+            "comments",
+            "feedback_date",
+        ],
+        "query": """
+            SELECT
+                f.feedback_id,
+                f.session_id,
+                c.full_name AS customer_name,
+                b.branch_name,
+                f.rating,
+                f.comments,
+                f.feedback_date
+            FROM Feedback f
+            JOIN Dining_Sessions ds ON f.session_id = ds.session_id
+            JOIN Customers c ON ds.customer_id = c.customer_id
+            JOIN Restaurant_Tables rt ON ds.table_id = rt.table_id
+            JOIN Dining_Areas da ON rt.area_id = da.area_id
+            JOIN Branches b ON da.branch_id = b.branch_id
+            ORDER BY f.feedback_date DESC, f.feedback_id DESC
+        """,
+    },
+}
+
+
+def csv_export_response(rows, headers, filename):
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(headers)
+
+    for row in rows:
+        writer.writerow([row.get(header, "") for header in headers])
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}"
+        },
+    )
 
 
 @app.route("/")
@@ -854,6 +1061,24 @@ def admin_analytics():
         )
     except Exception as e:
         return f"<h1>Admin Analytics Page Error</h1><pre>{str(e)}</pre>"
+
+
+@app.route("/admin/analytics/export/<dataset_key>")
+@require_role("admin")
+def admin_analytics_export(dataset_key):
+    dataset = EXPORT_DATASETS.get(dataset_key)
+    if not dataset:
+        return "Export dataset not found.", 404
+
+    try:
+        rows = fetch_all(dataset["query"])
+        return csv_export_response(
+            rows,
+            dataset["headers"],
+            dataset["filename"]
+        )
+    except Exception as e:
+        return f"<h1>Admin Export Error</h1><pre>{str(e)}</pre>"
 
 
 @app.route("/customer/dashboard")

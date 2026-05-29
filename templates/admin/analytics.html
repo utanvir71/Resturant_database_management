@@ -54,6 +54,20 @@
     </div>
 </section>
 
+<section class="panel panel-spaced">
+    <div class="table-meta">
+        <div>
+            <h2>Export Analytics Data</h2>
+            <p>Download clean CSV datasets for pandas, PySpark, Excel, or professor review.</p>
+        </div>
+    </div>
+    <div class="action-row">
+        {% for key, dataset in export_datasets.items() %}
+        <a href="/admin/analytics/export/{{ key }}" class="btn-primary">{{ dataset.label }}</a>
+        {% endfor %}
+    </div>
+</section>
+
 <section class="grid">
     <div class="panel">
         <div class="table-meta">
