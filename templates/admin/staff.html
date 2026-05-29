@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% set sidebar_title = "Restaurant Admin" %}
+{% set sidebar_subtitle = "Smart restaurant reservation, operations, and analytics panel." %}
+{% set nav_heading = "Admin Navigation" %}
+{% set active_page = "staff" %}
+{% set page_title = "Staff Management" %}
+{% set page_subtitle = "View staff assignments and add new staff using existing branches and roles." %}
+{% set topbar_badge = "Admin View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/admin/dashboard"},
+    {"key": "reservations", "label": "Reservations", "href": "/admin/reservations"},
+    {"key": "menu", "label": "Menu", "href": "/admin/menu"},
+    {"key": "staff", "label": "Staff", "href": "/admin/staff"},
+    {"key": "logout", "label": "Logout", "href": "/logout"}
+] %}
+
+{% block title %}Staff Management{% endblock %}
+
+{% block content %}
+{% if success %}
+<div class="alert alert-success">
+    {{ success }}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
+<section class="hero">
+    <div>
+        <h2>Staff Assignment Control</h2>
+        <p>
+            Admin can add staff members, assign them to existing restaurant branches and roles,
+            and review their current login eligibility through staff status.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/admin/menu" class="btn-primary">Manage Menu</a>
+        <a href="/admin/dashboard" class="btn-secondary">Dashboard</a>
+    </div>
+</section>
+
+<section class="summary-cards">
+    <div class="summary-card">
+        <h3>Total Shown</h3>
+        <p>{{ staff_members|length }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Active</h3>
+        <p>{{ staff_members | selectattr('staff_status', 'equalto', 'Active') | list | length }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Inactive</h3>
+        <p>{{ staff_members | selectattr('staff_status', 'equalto', 'Inactive') | list | length }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Roles</h3>
+        <p>{{ roles|length }}</p>
+    </div>
+</section>
+
+<section class="panel">
+    <h2>Add Staff Member</h2>
+    <form method="post" action="/admin/staff" class="form-grid">
+        <div class="form-group">
+            <label for="full_name">Full Name</label>
+            <input type="text" id="full_name" name="full_name" value="{{ form_data.get('full_name', '') }}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="phone">Phone</label>
+            <input type="text" id="phone" name="phone" value="{{ form_data.get('phone', '') }}" placeholder="010-7000-0001" required>
+        </div>
+
+        <div class="form-group">
+            <label for="hire_date">Hire Date</label>
+            <input type="date" id="hire_date" name="hire_date" value="{{ form_data.get('hire_date', '') }}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="branch_id">Branch</label>
+            <select id="branch_id" name="branch_id" required>
+                <option value="">Select Branch</option>
+                {% for branch in branches %}
+                <option value="{{ branch.branch_id }}" {% if form_data.get('branch_id') == branch.branch_id|string %}selected{% endif %}>
+                    {{ branch.branch_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="role_id">Role</label>
+            <select id="role_id" name="role_id" required>
+                <option value="">Select Role</option>
+                {% for role in roles %}
+                <option value="{{ role.role_id }}" {% if form_data.get('role_id') == role.role_id|string %}selected{% endif %}>
+                    {{ role.role_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="salary">Salary</label>
+            <input type="number" id="salary" name="salary" min="0" step="0.01" value="{{ form_data.get('salary', '') }}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="staff_status">Status</label>
+            {% set selected_new_status = form_data.get('staff_status', 'Active') %}
+            <select id="staff_status" name="staff_status" required>
+                <option value="Active" {% if selected_new_status == 'Active' %}selected{% endif %}>Active</option>
+                <option value="Inactive" {% if selected_new_status == 'Inactive' %}selected{% endif %}>Inactive</option>
+                <option value="OnLeave" {% if selected_new_status == 'OnLeave' %}selected{% endif %}>On Leave</option>
+            </select>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Add Staff</button>
+        </div>
+    </form>
+</section>
+
+<section class="panel panel-spaced">
+    <h2>Filter Staff</h2>
+    <form method="get" action="/admin/staff" class="filter-form">
+        <div class="form-group">
+            <label for="branch">Branch</label>
+            <select name="branch" id="branch">
+                <option value="">All Branches</option>
+                {% for branch in branches %}
+                <option value="{{ branch.branch_id }}" {% if selected_branch == branch.branch_id|string %}selected{% endif %}>
+                    {{ branch.branch_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="role">Role</label>
+            <select name="role" id="role">
+                <option value="">All Roles</option>
+                {% for role in roles %}
+                <option value="{{ role.role_id }}" {% if selected_role == role.role_id|string %}selected{% endif %}>
+                    {{ role.role_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="status">Status</label>
+            <select name="status" id="status">
+                <option value="">All Statuses</option>
+                <option value="Active" {% if selected_status == 'Active' %}selected{% endif %}>Active</option>
+                <option value="Inactive" {% if selected_status == 'Inactive' %}selected{% endif %}>Inactive</option>
+                <option value="OnLeave" {% if selected_status == 'OnLeave' %}selected{% endif %}>On Leave</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Apply Filter</button>
+        <a href="/admin/staff" class="btn btn-secondary">Reset</a>
+    </form>
+</section>
+
+<section class="panel panel-spaced">
+    <div class="table-meta">
+        <div>
+            <h2>Staff List</h2>
+            <p>Staff login uses phone plus the shared staff password, and only Active staff can log in.</p>
+        </div>
+        <p class="reservation-count">{{ staff_members|length }} records</p>
+    </div>
+
+    {% if staff_members %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Branch</th>
+                    <th>Role</th>
+                    <th>Hire Date</th>
+                    <th>Salary</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for staff in staff_members %}
+                <tr>
+                    <td>{{ staff.staff_id }}</td>
+                    <td>{{ staff.full_name }}</td>
+                    <td>{{ staff.phone }}</td>
+                    <td>{{ staff.branch_name }}</td>
+                    <td>{{ staff.role_name }}</td>
+                    <td>{{ staff.hire_date }}</td>
+                    <td>{{ "%.2f"|format(staff.salary) }}</td>
+                    <td>
+                        {% set status = staff.staff_status|lower %}
+                        <span class="badge {% if status == 'active' %}paid{% elif status == 'inactive' %}unpaid{% else %}pending{% endif %}">
+                            {{ staff.staff_status }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No staff found</h3>
+        <p>Try changing the selected branch, role, or status filter.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

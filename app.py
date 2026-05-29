@@ -184,6 +184,65 @@ def load_admin_menu_context(error=None, form_data=None):
     }
 
 
+def load_admin_staff_context(error=None, form_data=None):
+    selected_branch = request.args.get("branch", "")
+    selected_role = request.args.get("role", "")
+    selected_status = request.args.get("status", "")
+
+    branches = get_branches()
+    roles = fetch_all("""
+        SELECT role_id, role_name
+        FROM Staff_Roles
+        ORDER BY role_name
+    """)
+
+    query = """
+    SELECT
+        s.staff_id,
+        s.full_name,
+        s.phone,
+        s.hire_date,
+        s.salary,
+        s.staff_status,
+        b.branch_id,
+        b.branch_name,
+        sr.role_id,
+        sr.role_name
+    FROM Staff s
+    JOIN Branches b ON s.branch_id = b.branch_id
+    JOIN Staff_Roles sr ON s.role_id = sr.role_id
+    WHERE 1=1
+    """
+    params = []
+
+    if selected_branch:
+        query += " AND b.branch_id = %s"
+        params.append(int(selected_branch))
+
+    if selected_role:
+        query += " AND sr.role_id = %s"
+        params.append(int(selected_role))
+
+    if selected_status:
+        query += " AND s.staff_status = %s"
+        params.append(selected_status)
+
+    query += " ORDER BY b.branch_name, sr.role_name, s.full_name"
+    staff_members = fetch_all(query, tuple(params))
+
+    return {
+        "staff_members": staff_members,
+        "branches": branches,
+        "roles": roles,
+        "selected_branch": selected_branch,
+        "selected_role": selected_role,
+        "selected_status": selected_status,
+        "success": request.args.get("success"),
+        "error": error or request.args.get("error"),
+        "form_data": form_data or {},
+    }
+
+
 @app.route("/")
 def home():
     return render_template(
@@ -444,6 +503,62 @@ def admin_update_menu_item(branch_id, item_id):
             "admin_menu",
             error=clean_db_error(e)
         ))
+
+
+@app.route("/admin/staff", methods=["GET", "POST"])
+@require_role("admin")
+def admin_staff():
+    if request.method == "GET":
+        try:
+            return render_template(
+                "admin/staff.html",
+                **load_admin_staff_context()
+            )
+        except Exception as e:
+            return f"<h1>Admin Staff Page Error</h1><pre>{str(e)}</pre>"
+
+    form_data = request.form.to_dict()
+
+    try:
+        execute_query("""
+            EXEC dbo.sp_AdminAddStaff
+                @branch_id = %s,
+                @role_id = %s,
+                @full_name = %s,
+                @phone = %s,
+                @hire_date = %s,
+                @salary = %s,
+                @staff_status = %s
+        """, (
+            int(request.form.get("branch_id", "")),
+            int(request.form.get("role_id", "")),
+            request.form.get("full_name", "").strip(),
+            request.form.get("phone", "").strip(),
+            request.form.get("hire_date", ""),
+            float(request.form.get("salary", "")),
+            request.form.get("staff_status", "")
+        ))
+
+        return redirect(url_for(
+            "admin_staff",
+            success="Staff member added."
+        ))
+    except ValueError:
+        return render_template(
+            "admin/staff.html",
+            **load_admin_staff_context(
+                error="Please enter valid branch, role, date, and salary values.",
+                form_data=form_data
+            )
+        )
+    except Exception as e:
+        return render_template(
+            "admin/staff.html",
+            **load_admin_staff_context(
+                error=clean_db_error(e),
+                form_data=form_data
+            )
+        )
 
 
 @app.route("/customer/dashboard")

@@ -1014,6 +1014,99 @@ BEGIN
 END;
 GO
 
+/* ============================================================
+   Stored Procedure: Admin Add Staff
+   Purpose:
+   - Add a staff member using existing branch and staff role records.
+   - Validate phone uniqueness and allowed staff statuses.
+   - Keep staff assignment clean for staff login and branch-limited pages.
+   ============================================================ */
+
+CREATE OR ALTER PROCEDURE dbo.sp_AdminAddStaff
+    @branch_id INT,
+    @role_id INT,
+    @full_name VARCHAR(100),
+    @phone VARCHAR(20),
+    @hire_date DATE,
+    @salary DECIMAL(10,2),
+    @staff_status VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    SET @full_name = LTRIM(RTRIM(@full_name));
+    SET @phone = LTRIM(RTRIM(@phone));
+
+    IF @full_name = '' OR @phone = ''
+    BEGIN
+        RAISERROR('Staff name and phone are required.', 16, 1);
+        RETURN;
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM Branches
+        WHERE branch_id = @branch_id
+    )
+    BEGIN
+        RAISERROR('Selected branch does not exist.', 16, 1);
+        RETURN;
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM Staff_Roles
+        WHERE role_id = @role_id
+    )
+    BEGIN
+        RAISERROR('Selected staff role does not exist.', 16, 1);
+        RETURN;
+    END;
+
+    IF EXISTS (
+        SELECT 1
+        FROM Staff
+        WHERE phone = @phone
+    )
+    BEGIN
+        RAISERROR('A staff member with this phone already exists.', 16, 1);
+        RETURN;
+    END;
+
+    IF @salary < 0
+    BEGIN
+        RAISERROR('Salary cannot be negative.', 16, 1);
+        RETURN;
+    END;
+
+    IF @staff_status NOT IN ('Active', 'Inactive', 'OnLeave')
+    BEGIN
+        RAISERROR('Invalid staff status.', 16, 1);
+        RETURN;
+    END;
+
+    INSERT INTO Staff (
+        branch_id,
+        role_id,
+        full_name,
+        phone,
+        hire_date,
+        salary,
+        staff_status
+    )
+    VALUES (
+        @branch_id,
+        @role_id,
+        @full_name,
+        @phone,
+        @hire_date,
+        @salary,
+        @staff_status
+    );
+END;
+GO
+
 
 
 EXEC dbo.sp_SyncTableStatuses;
