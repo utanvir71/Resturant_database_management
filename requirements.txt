@@ -3,3 +3,4 @@ python-dotenv
 pymssql
 pandas
 matplotlib
+pyspark
