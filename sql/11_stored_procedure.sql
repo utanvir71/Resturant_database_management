@@ -1107,6 +1107,43 @@ BEGIN
 END;
 GO
 
+/* ============================================================
+   Stored Procedure: Admin Update Staff Status
+   Purpose:
+   - Soft-remove staff by setting status to Inactive.
+   - Reactivate or mark staff OnLeave without deleting history.
+   ============================================================ */
+
+CREATE OR ALTER PROCEDURE dbo.sp_AdminUpdateStaffStatus
+    @staff_id INT,
+    @staff_status VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM Staff
+        WHERE staff_id = @staff_id
+    )
+    BEGIN
+        RAISERROR('Staff member was not found.', 16, 1);
+        RETURN;
+    END;
+
+    IF @staff_status NOT IN ('Active', 'Inactive', 'OnLeave')
+    BEGIN
+        RAISERROR('Invalid staff status.', 16, 1);
+        RETURN;
+    END;
+
+    UPDATE Staff
+    SET staff_status = @staff_status
+    WHERE staff_id = @staff_id;
+END;
+GO
+
 
 
 EXEC dbo.sp_SyncTableStatuses;

@@ -191,6 +191,7 @@
                     <th>Hire Date</th>
                     <th>Salary</th>
                     <th>Status</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -208,6 +209,16 @@
                         <span class="badge {% if status == 'active' %}paid{% elif status == 'inactive' %}unpaid{% else %}pending{% endif %}">
                             {{ staff.staff_status }}
                         </span>
+                    </td>
+                    <td>
+                        <form method="post" action="/admin/staff/{{ staff.staff_id }}/status" class="action-row">
+                            <select name="staff_status" required>
+                                <option value="Active" {% if staff.staff_status == 'Active' %}selected{% endif %}>Active</option>
+                                <option value="Inactive" {% if staff.staff_status == 'Inactive' %}selected{% endif %}>Inactive</option>
+                                <option value="OnLeave" {% if staff.staff_status == 'OnLeave' %}selected{% endif %}>On Leave</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}
