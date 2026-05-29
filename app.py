@@ -243,6 +243,80 @@ def load_admin_staff_context(error=None, form_data=None):
     }
 
 
+def load_admin_shift_context(error=None, form_data=None):
+    selected_branch = request.args.get("branch", "")
+    selected_staff = request.args.get("staff", "")
+    selected_status = request.args.get("status", "")
+    selected_date = request.args.get("date", "")
+
+    branches = get_branches()
+    staff_options = fetch_all("""
+        SELECT
+            s.staff_id,
+            s.full_name,
+            s.staff_status,
+            b.branch_name,
+            sr.role_name
+        FROM Staff s
+        JOIN Branches b ON s.branch_id = b.branch_id
+        JOIN Staff_Roles sr ON s.role_id = sr.role_id
+        ORDER BY b.branch_name, s.full_name
+    """)
+
+    query = """
+    SELECT
+        sh.shift_id,
+        sh.shift_date,
+        sh.start_time,
+        sh.end_time,
+        sh.shift_status,
+        s.staff_id,
+        s.full_name AS staff_name,
+        s.staff_status,
+        b.branch_id,
+        b.branch_name,
+        sr.role_name
+    FROM Shifts sh
+    JOIN Staff s ON sh.staff_id = s.staff_id
+    JOIN Branches b ON s.branch_id = b.branch_id
+    JOIN Staff_Roles sr ON s.role_id = sr.role_id
+    WHERE 1=1
+    """
+    params = []
+
+    if selected_branch:
+        query += " AND b.branch_id = %s"
+        params.append(int(selected_branch))
+
+    if selected_staff:
+        query += " AND s.staff_id = %s"
+        params.append(int(selected_staff))
+
+    if selected_status:
+        query += " AND sh.shift_status = %s"
+        params.append(selected_status)
+
+    if selected_date:
+        query += " AND sh.shift_date = %s"
+        params.append(selected_date)
+
+    query += " ORDER BY sh.shift_date DESC, sh.start_time DESC, b.branch_name, s.full_name"
+    shifts = fetch_all(query, tuple(params))
+
+    return {
+        "shifts": shifts,
+        "branches": branches,
+        "staff_options": staff_options,
+        "selected_branch": selected_branch,
+        "selected_staff": selected_staff,
+        "selected_status": selected_status,
+        "selected_date": selected_date,
+        "success": request.args.get("success"),
+        "error": error or request.args.get("error"),
+        "form_data": form_data or {},
+    }
+
+
 @app.route("/")
 def home():
     return render_template(
@@ -583,6 +657,58 @@ def admin_update_staff_status(staff_id):
             "admin_staff",
             error=clean_db_error(e)
         ))
+
+
+@app.route("/admin/shifts", methods=["GET", "POST"])
+@require_role("admin")
+def admin_shifts():
+    if request.method == "GET":
+        try:
+            return render_template(
+                "admin/shifts.html",
+                **load_admin_shift_context()
+            )
+        except Exception as e:
+            return f"<h1>Admin Shifts Page Error</h1><pre>{str(e)}</pre>"
+
+    form_data = request.form.to_dict()
+
+    try:
+        execute_query("""
+            EXEC dbo.sp_AdminAddShift
+                @staff_id = %s,
+                @shift_date = %s,
+                @start_time = %s,
+                @end_time = %s,
+                @shift_status = %s
+        """, (
+            int(request.form.get("staff_id", "")),
+            request.form.get("shift_date", ""),
+            request.form.get("start_time", ""),
+            request.form.get("end_time", ""),
+            request.form.get("shift_status", "")
+        ))
+
+        return redirect(url_for(
+            "admin_shifts",
+            success="Shift scheduled."
+        ))
+    except ValueError:
+        return render_template(
+            "admin/shifts.html",
+            **load_admin_shift_context(
+                error="Please enter valid staff, date, and time values.",
+                form_data=form_data
+            )
+        )
+    except Exception as e:
+        return render_template(
+            "admin/shifts.html",
+            **load_admin_shift_context(
+                error=clean_db_error(e),
+                form_data=form_data
+            )
+        )
 
 
 @app.route("/customer/dashboard")

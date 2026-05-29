@@ -1144,6 +1144,77 @@ BEGIN
 END;
 GO
 
+/* ============================================================
+   Stored Procedure: Admin Add Shift
+   Purpose:
+   - Schedule a shift for an existing staff member.
+   - Validate time ordering and allowed shift statuses.
+   - Prevent exact duplicate shifts for the same staff/date/time.
+   ============================================================ */
+
+CREATE OR ALTER PROCEDURE dbo.sp_AdminAddShift
+    @staff_id INT,
+    @shift_date DATE,
+    @start_time TIME,
+    @end_time TIME,
+    @shift_status VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM Staff
+        WHERE staff_id = @staff_id
+    )
+    BEGIN
+        RAISERROR('Selected staff member does not exist.', 16, 1);
+        RETURN;
+    END;
+
+    IF @start_time >= @end_time
+    BEGIN
+        RAISERROR('Shift start time must be before end time.', 16, 1);
+        RETURN;
+    END;
+
+    IF @shift_status NOT IN ('Scheduled', 'Completed', 'Cancelled')
+    BEGIN
+        RAISERROR('Invalid shift status.', 16, 1);
+        RETURN;
+    END;
+
+    IF EXISTS (
+        SELECT 1
+        FROM Shifts
+        WHERE staff_id = @staff_id
+          AND shift_date = @shift_date
+          AND start_time = @start_time
+          AND end_time = @end_time
+    )
+    BEGIN
+        RAISERROR('This exact shift already exists for the selected staff member.', 16, 1);
+        RETURN;
+    END;
+
+    INSERT INTO Shifts (
+        staff_id,
+        shift_date,
+        start_time,
+        end_time,
+        shift_status
+    )
+    VALUES (
+        @staff_id,
+        @shift_date,
+        @start_time,
+        @end_time,
+        @shift_status
+    );
+END;
+GO
+
 
 
 EXEC dbo.sp_SyncTableStatuses;
