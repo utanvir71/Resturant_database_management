@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% set sidebar_title = "Restaurant Admin" %}
+{% set sidebar_subtitle = "Smart restaurant reservation, operations, and analytics panel." %}
+{% set nav_heading = "Admin Navigation" %}
+{% set active_page = "analytics" %}
+{% set page_title = "Analytics Dashboard" %}
+{% set page_subtitle = "MSSQL aggregate insights from reservations, sessions, orders, payments, menu items, and feedback." %}
+{% set topbar_badge = "Analytics View" %}
+
+{% set nav_links = [
+    {"key": "dashboard", "label": "Dashboard", "href": "/admin/dashboard"},
+    {"key": "reservations", "label": "Reservations", "href": "/admin/reservations"},
+    {"key": "menu", "label": "Menu", "href": "/admin/menu"},
+    {"key": "staff", "label": "Staff", "href": "/admin/staff"},
+    {"key": "shifts", "label": "Shifts", "href": "/admin/shifts"},
+    {"key": "analytics", "label": "Analytics", "href": "/admin/analytics"},
+    {"key": "logout", "label": "Logout", "href": "/logout"}
+] %}
+
+{% block title %}Analytics Dashboard{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div>
+        <h2>Restaurant Performance Analytics</h2>
+        <p>
+            These metrics are calculated directly from SQL Server using joins, grouping, aggregation,
+            and status-based filters across the operational schema.
+        </p>
+    </div>
+    <div class="hero-actions">
+        <a href="/admin/dashboard" class="btn-secondary">Dashboard</a>
+        <a href="/admin/menu" class="btn-secondary">Menu</a>
+    </div>
+</section>
+
+<section class="summary-cards">
+    <div class="summary-card">
+        <h3>Total Revenue</h3>
+        <p>{{ "%.2f"|format(summary.total_revenue) }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Paid Orders</h3>
+        <p>{{ summary.paid_orders }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Closed Sessions</h3>
+        <p>{{ summary.completed_sessions }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Avg Rating</h3>
+        <p>{{ "%.2f"|format(summary.avg_rating) }}</p>
+    </div>
+</section>
+
+<section class="grid">
+    <div class="panel">
+        <div class="table-meta">
+            <div>
+                <h2>Revenue by Branch</h2>
+                <p>Revenue comes from paid payment records joined back to branch tables.</p>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="compact-table">
+                <thead>
+                    <tr>
+                        <th>Branch</th>
+                        <th>Paid Orders</th>
+                        <th>Revenue</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in revenue_by_branch %}
+                    <tr>
+                        <td>{{ row.branch_name }}</td>
+                        <td>{{ row.paid_orders }}</td>
+                        <td>{{ "%.2f"|format(row.revenue) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="table-meta">
+            <div>
+                <h2>Payment Methods</h2>
+                <p>Paid transaction count and total collected by payment method.</p>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="compact-table">
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Payments</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in payment_methods %}
+                    <tr>
+                        <td>{{ row.payment_method }}</td>
+                        <td>{{ row.payment_count }}</td>
+                        <td>{{ "%.2f"|format(row.total_amount) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3">No paid payments yet</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section class="panel panel-spaced">
+    <div class="table-meta">
+        <div>
+            <h2>Top Selling Menu Items</h2>
+            <p>Cancelled orders are excluded, and item revenue uses Order_Items agreed unit price.</p>
+        </div>
+        <p class="reservation-count">{{ top_menu_items|length }} records</p>
+    </div>
+
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Category</th>
+                    <th>Quantity Sold</th>
+                    <th>Gross Sales</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in top_menu_items %}
+                <tr>
+                    <td>{{ item.item_name }}</td>
+                    <td>{{ item.category_name }}</td>
+                    <td>{{ item.quantity_sold }}</td>
+                    <td>{{ "%.2f"|format(item.gross_sales) }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4">No order item data yet</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="grid panel-spaced">
+    <div class="panel">
+        <h2>Reservation Status</h2>
+        <div class="stats-list">
+            {% for row in reservation_status %}
+            <div class="stats-item">
+                <span>{{ row.reservation_status }}</span>
+                <span>{{ row.total }}</span>
+            </div>
+            {% else %}
+            <div class="stats-item">
+                <span>No reservations</span>
+                <span>0</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>Dining Session Status</h2>
+        <div class="stats-list">
+            {% for row in session_status %}
+            <div class="stats-item">
+                <span>{{ row.session_status }}</span>
+                <span>{{ row.total }}</span>
+            </div>
+            {% else %}
+            <div class="stats-item">
+                <span>No sessions</span>
+                <span>0</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="panel panel-spaced">
+    <div class="table-meta">
+        <div>
+            <h2>Feedback by Branch</h2>
+            <p>Average rating is calculated from feedback linked to dining sessions and tables.</p>
+        </div>
+    </div>
+    <div class="table-wrapper">
+        <table class="compact-table">
+            <thead>
+                <tr>
+                    <th>Branch</th>
+                    <th>Feedback Count</th>
+                    <th>Average Rating</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in feedback_by_branch %}
+                <tr>
+                    <td>{{ row.branch_name }}</td>
+                    <td>{{ row.feedback_count }}</td>
+                    <td>{{ "%.2f"|format(row.avg_rating) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -317,6 +317,115 @@ def load_admin_shift_context(error=None, form_data=None):
     }
 
 
+def load_admin_analytics_context():
+    summary = {
+        "total_revenue": fetch_one("""
+            SELECT COALESCE(SUM(amount_paid), 0) AS value
+            FROM Payments
+            WHERE payment_status = 'Paid'
+        """)["value"],
+        "paid_orders": fetch_one("""
+            SELECT COUNT(*) AS value
+            FROM Payments
+            WHERE payment_status = 'Paid'
+        """)["value"],
+        "completed_sessions": fetch_one("""
+            SELECT COUNT(*) AS value
+            FROM Dining_Sessions
+            WHERE session_status = 'Closed'
+        """)["value"],
+        "avg_rating": fetch_one("""
+            SELECT COALESCE(AVG(CAST(rating AS DECIMAL(10,2))), 0) AS value
+            FROM Feedback
+        """)["value"],
+    }
+
+    revenue_by_branch = fetch_all("""
+        SELECT
+            b.branch_name,
+            COUNT(DISTINCT o.order_id) AS paid_orders,
+            COALESCE(SUM(p.amount_paid), 0) AS revenue
+        FROM Branches b
+        LEFT JOIN Dining_Areas da ON b.branch_id = da.branch_id
+        LEFT JOIN Restaurant_Tables rt ON da.area_id = rt.area_id
+        LEFT JOIN Dining_Sessions ds ON rt.table_id = ds.table_id
+        LEFT JOIN [Orders] o ON ds.session_id = o.session_id
+        LEFT JOIN Payments p
+            ON o.order_id = p.order_id
+           AND p.payment_status = 'Paid'
+        GROUP BY b.branch_name
+        ORDER BY revenue DESC, b.branch_name
+    """)
+
+    reservation_status = fetch_all("""
+        SELECT
+            reservation_status,
+            COUNT(*) AS total
+        FROM Reservations
+        GROUP BY reservation_status
+        ORDER BY total DESC, reservation_status
+    """)
+
+    top_menu_items = fetch_all("""
+        SELECT TOP 10
+            mi.item_name,
+            mc.category_name,
+            SUM(oi.quantity) AS quantity_sold,
+            SUM(oi.quantity * oi.agreed_unit_price) AS gross_sales
+        FROM Order_Items oi
+        JOIN Menu_Items mi ON oi.item_id = mi.item_id
+        JOIN Menu_Categories mc ON mi.category_id = mc.category_id
+        JOIN [Orders] o ON oi.order_id = o.order_id
+        WHERE o.order_status <> 'Cancelled'
+        GROUP BY mi.item_name, mc.category_name
+        ORDER BY quantity_sold DESC, gross_sales DESC
+    """)
+
+    payment_methods = fetch_all("""
+        SELECT
+            payment_method,
+            COUNT(*) AS payment_count,
+            SUM(amount_paid) AS total_amount
+        FROM Payments
+        WHERE payment_status = 'Paid'
+        GROUP BY payment_method
+        ORDER BY total_amount DESC
+    """)
+
+    feedback_by_branch = fetch_all("""
+        SELECT
+            b.branch_name,
+            COUNT(f.feedback_id) AS feedback_count,
+            COALESCE(AVG(CAST(f.rating AS DECIMAL(10,2))), 0) AS avg_rating
+        FROM Branches b
+        LEFT JOIN Dining_Areas da ON b.branch_id = da.branch_id
+        LEFT JOIN Restaurant_Tables rt ON da.area_id = rt.area_id
+        LEFT JOIN Dining_Sessions ds ON rt.table_id = ds.table_id
+        LEFT JOIN Feedback f ON ds.session_id = f.session_id
+        GROUP BY b.branch_name
+        ORDER BY avg_rating DESC, feedback_count DESC
+    """)
+
+    session_status = fetch_all("""
+        SELECT
+            session_status,
+            COUNT(*) AS total
+        FROM Dining_Sessions
+        GROUP BY session_status
+        ORDER BY total DESC, session_status
+    """)
+
+    return {
+        "summary": summary,
+        "revenue_by_branch": revenue_by_branch,
+        "reservation_status": reservation_status,
+        "top_menu_items": top_menu_items,
+        "payment_methods": payment_methods,
+        "feedback_by_branch": feedback_by_branch,
+        "session_status": session_status,
+    }
+
+
 @app.route("/")
 def home():
     return render_template(
@@ -733,6 +842,18 @@ def admin_update_shift_status(shift_id):
             "admin_shifts",
             error=clean_db_error(e)
         ))
+
+
+@app.route("/admin/analytics")
+@require_role("admin")
+def admin_analytics():
+    try:
+        return render_template(
+            "admin/analytics.html",
+            **load_admin_analytics_context()
+        )
+    except Exception as e:
+        return f"<h1>Admin Analytics Page Error</h1><pre>{str(e)}</pre>"
 
 
 @app.route("/customer/dashboard")
